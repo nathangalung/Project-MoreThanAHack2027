@@ -1,0 +1,59 @@
+[project]
+name = "morethanahack2027"
+version = "0.1.0"
+description = "Frame level ball possession for More than a Hack 2027"
+readme = "README.md"
+authors = [
+    { name = "Bryan Philinathaniel Hutagalung" },
+    { name = "Shazya Audrea Taufik" },
+    { name = "Yovanka Sandrina Maharaja" },
+    { name = "Tamara Mayranda Lubis" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    "ipykernel>=7.4.0",
+    "jupyter>=1.1.1",
+    "numpy>=2.5.4",
+    "polars>=2.1.0",
+    "torch>=2.15.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "possession"
+module-root = ""
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+    "ruff>=0.17.4",
+]
+evaluation = [
+    "pandas>=3.1.1",
+]
+notebook = [
+    "jupyterlab>=4.6.6",
+    "matplotlib>=3.11.2",
+]
+
+[tool.uv]
+default-groups = ["dev", "evaluation", "notebook"]
+
+[tool.ruff]
+line-length = 120
+src = ["."]
+extend-exclude = ["evaluation"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "NPY"]
+
+[tool.pyright]
+include = ["possession", "tests"]
+extraPaths = ["evaluation"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

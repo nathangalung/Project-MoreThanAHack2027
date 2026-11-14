@@ -1,0 +1,33 @@
+# Private ground truth, never published
+*_possession_gt.csv
+*_possession_gt_meta.json
+*_possession_gt_reference.csv
+possession_by_frame.pkl
+
+# Submissions label the whole match
+evaluation/results/*.csv
+# Organiser baselines read no truth
+!evaluation/results/baseline_*.csv
+evaluation/reports/
+evaluation/scoreboard.csv
+
+# Gated match data
+data/*
+!data/README.md
+*.mp4
+*.gzip
+*.pl3container
+*.pdf
+
+# Caches and downloaded open matches
+artifacts/
+
+# Editors and build output
+.idea/
+.vscode/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.DS_Store
