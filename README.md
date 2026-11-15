@@ -27,10 +27,10 @@ No label from the target match is used for training or tuning. The public 5 minu
 
 | Measure | Where It Is Measured | Value |
 |---|---|---|
-| spellF1 | 20 real matches with automatic tracking, never trained on | 0.6637 |
-| spellF1 | Two held-out open matches, degraded | 0.6438 |
+| spellF1 | 20 real matches with automatic tracking, never trained on | 0.6712 |
+| spellF1 | Two held-out open matches, degraded | 0.6497 |
 | spellF1 | Public window of the target match | 0.6667 |
-| macroF1 | Public window of the target match | 0.8972 |
+| macroF1 | Public window of the target match | 0.9259 |
 
 The public window has 17 possessions and a noise band of about 0.33 on spellF1, so it is a check and not a measure. `BYTZ.md` has the full account.
 

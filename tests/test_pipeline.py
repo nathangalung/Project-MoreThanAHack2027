@@ -3,9 +3,11 @@
 from dataclasses import replace
 
 import numpy as np
+import polars as pl
 
 from possession.decode import decode, drop_short, viterbi, waiting
 from possession.degrade import carry_dead_ball, degrade, runs, smooth
+from possession.dfl import club_ids, squads
 from possession.features import FEATURE_NAMES, N_FEATURES, match_features
 from possession.match import AWAY, DEAD, HOME, Match, mirrored
 from possession.skillcorner import hold, upsample
@@ -109,6 +111,15 @@ def test_decoder_tuning_balances_both_groups() -> None:
     assert alone == [1.0, 1.0]
     assert max(1.0 - score for score in scores) < 1.0
     assert set(best) == {"penalty", "min_spell", "min_dead"}
+
+
+def test_squads_leave_out_referees() -> None:
+    frames = pl.DataFrame({"team": ["club-a", "referee", "club-b", "BALL", "club-b"], "person": list("abcde")})
+    assert squads(frames, "club-a", "club-b") == {"home": ["a"], "away": ["c", "e"]}
+
+
+def test_club_ids_come_from_metadata() -> None:
+    assert club_ids('<General HomeTeamId="club-a" GuestTeamId="club-b" />') == ("club-a", "club-b")
 
 
 def test_mirrored_views_swap_teams() -> None:

@@ -37,10 +37,18 @@ def fetch(match_id: str, kind: str) -> Path:
     return path
 
 
-def home_team_id(match_id: str) -> str:
-    """Home club id from metadata."""
-    text = fetch(match_id, "meta").read_text(encoding="utf-8")
-    return text.split('HomeTeamId="')[1].split('"')[0]
+def club_ids(text: str) -> tuple[str, str]:
+    """Home and away club ids."""
+    home, away = (text.split(f'{side}TeamId="')[1].split('"')[0] for side in ("Home", "Guest"))
+    return home, away
+
+
+def squads(frames: pl.DataFrame, home_id: str, away_id: str) -> dict[str, list[str]]:
+    """Players per club, no referees."""
+    return {
+        side: frames.filter(pl.col("team") == club)["person"].unique(maintain_order=True).to_list()
+        for side, club in (("home", home_id), ("away", away_id))
+    }
 
 
 def read_frames(path: Path) -> pl.DataFrame:
@@ -82,14 +90,7 @@ def team_array(frames: pl.DataFrame, persons: list[str], first: int, n: int) -> 
 def build(match_id: str) -> dict[str, np.ndarray]:
     """Parse one match into arrays."""
     frames = read_frames(fetch(match_id, "tracking"))
-    home_id = home_team_id(match_id)
-    persons = {
-        side: frames.filter(test)["person"].unique(maintain_order=True).to_list()
-        for side, test in (
-            ("home", pl.col("team") == home_id),
-            ("away", ~pl.col("team").is_in([home_id, "BALL"])),
-        )
-    }
+    persons = squads(frames, *club_ids(fetch(match_id, "meta").read_text(encoding="utf-8")))
     parts: dict[str, list[np.ndarray]] = {key: [] for key in ("home", "away", "ball", "height", "label")}
     lengths = []
     for section in SECTIONS:

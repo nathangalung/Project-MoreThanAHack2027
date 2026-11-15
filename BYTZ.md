@@ -12,14 +12,16 @@ We label each frame as home possession, away possession, or dead ball with an av
 
 | Measure | Where It Is Measured | Value |
 |---|---|---|
-| spellF1 of Our Model | 20 real matches with automatic tracking (SkillCorner), never trained on | 0.6637 |
-| spellF1 of Our Model | Two held-out open matches (DFL), degraded | 0.6438 |
+| spellF1 of Our Model | 20 real matches with automatic tracking (SkillCorner), never trained on | 0.6712 |
+| spellF1 of Our Model | Two held-out open matches (DFL), degraded | 0.6497 |
 | spellF1 of the Submitted File | Public window of the provided match | 0.6667 |
-| macroF1 of the Submitted File | Public window of the provided match | 0.8972 |
+| macroF1 of the Submitted File | Public window of the provided match | 0.9259 |
 | spellF1 of `baseline_smooth50` | Public window of the provided match | 0.3256 |
 | spellF1 of `baseline_smooth50`, the Published Floor | Full provided match, reported by the organisers | 0.2433 |
 
 The scores on the open matches are optimistic. The decoder setting was chosen on those same matches, and the real matches also decided three design choices: the last simulation change, the averaging over mirrored views, and the number of networks. The networks behind the first two rows were trained on five open matches. The submitted networks were retrained on all seven.
+
+Late in the work we found that two of the seven open matches carry three referee tracks each, and that our loader had counted them as away players. One of the two is a held-out match. We left the referees out and trained again. With the same decoder setting, the score on the real matches rose from 0.6637 to 0.6712. The table above, the decoder table, and the ensemble sizes are measured with the final networks. The tests of single design choices further down were run before this correction, so their absolute scores are a little lower. Each of them compares two variants under the same conditions.
 
 The public window has only 17 possessions. The official bootstrap gives a noise band of about 0.33 on its spellF1, so it cannot separate two models. We printed it after each run as a check that the pipeline is correct. The model, the decoder, and the number of networks were chosen on the other two validation sets. The public window still touched the work in four places, and we list them so a reader can judge.
 
@@ -51,6 +53,7 @@ The open tracking comes from the calibrated multi-camera system of the league. T
 | Positions much smoother than the open data | Gaussian blur along time that ignores missing frames, with a width of 4 to 9 frames for the ball |
 | Player tracks drop out, and 33 stretches lose most tracks at once | Random track loss and simulated camera loss |
 | No player identities, only a team per track | Features only use sets of players per team |
+| Only the two teams are tracked. Two of the open matches also carry three referee tracks each | Referee tracks are left out when the open matches are loaded |
 | Ball keeps moving during a stoppage, because a player carries it to the restart spot. The open data freezes it with a speed of exactly zero | Frozen ball replaced by a path that visits nearby players and ends at the restart spot |
 | Two cameras disagree about the ball, mostly when it is in the air | A second ball track is simulated from another camera position using the real ball height in the open data, with a slow calibration error and a time shift of up to three frames |
 | Broadcast cuts to replays and close-ups, mostly during stoppages | Cutaways simulated around dead ball stretches, plus a few during live play |
@@ -94,7 +97,7 @@ A recurrent network fits the task because possession is a state that persists: t
 | Choice | Evidence |
 |---|---|
 | Fresh degraded copies of every match in every epoch | With fixed copies the training loss jumped each time they were replaced, so the network was memorising them. Held-out spellF1 rose from 0.6458 to 0.6636 for one seed and from 0.6459 to 0.6497 for another |
-| Average of five networks from different seeds | On the real matches the score rises with every network added: 0.6415 for one, 0.6551 for two, 0.6589 for three, 0.6618 for four, and 0.6637 for five. Five against three is +0.0047 with a paired standard error of 0.0011, better on 17 of 20 matches. The held-out open matches stay level |
+| Average of five networks from different seeds | On the real matches the score rises with every network added: 0.6497 for one, 0.6620 for two, 0.6665 for three, 0.6689 for four, and 0.6712 for five. Five against three is +0.0047 with a paired standard error of 0.0012, better on 17 of 20 matches. The held-out open matches gain less, from 0.6422 for one to 0.6497 for five |
 | Average over eight mirrored views of the match (both flips and the team swap) | The network is trained with these as augmentations, so every view is a valid input. On the real matches it added 0.015 spellF1, with a paired standard error of 0.003 |
 
 Every training frame of all seven matches is used. Random crops only decide which stretches share a batch.
@@ -107,15 +110,15 @@ The two validation sets want different settings, because they label possession d
 
 | Switch Cost | spellF1 on Held-Out DFL | spellF1 on Real SkillCorner |
 |---|---|---|
-| 0 | 0.6621 | 0.6510 |
-| 5 | 0.6632 | 0.6534 |
-| 10 | 0.6574 | 0.6557 |
-| 20 | 0.6438 | 0.6672 |
-| 40 | 0.6139 | 0.6773 |
-| 60 | 0.5832 | 0.6840 |
-| 120 | 0.5056 | 0.6600 |
+| 0 | 0.6725 | 0.6567 |
+| 5 | 0.6723 | 0.6580 |
+| 10 | 0.6633 | 0.6627 |
+| 20 | 0.6497 | 0.6743 |
+| 40 | 0.6211 | 0.6841 |
+| 60 | 0.5939 | 0.6862 |
+| 120 | 0.5202 | 0.6631 |
 
-Each cell is the best score over the minimum lengths, and the table leaves out some costs. The best score anywhere in the grid is 0.6639 for DFL (cost 2) and 0.6840 for SkillCorner (cost 60). We keep the setting whose larger loss against these two is smallest. That is a switch cost of 20 with no minimum length. It scores 0.6438 on DFL and 0.6637 on SkillCorner, a loss of 0.020 on each. This rule was fixed on these two sets only. We also looked at the public window score for several costs as a check, and did not use it for the choice.
+Each cell is the best score over the minimum lengths, and the table leaves out some costs. The best score anywhere in the grid is 0.6742 for DFL (cost 2) and 0.6862 for SkillCorner (cost 60). We keep the setting whose larger loss against these two is smallest. That is a switch cost of 20 with no minimum length. It scores 0.6497 on DFL and 0.6712 on SkillCorner, a loss of 0.025 on DFL and 0.015 on SkillCorner. This rule was fixed on these two sets only. We also looked at the public window score for several costs as a check, and did not use it for the choice.
 
 ### Adapting to the Provided Match, Tested and Not Adopted
 
@@ -210,7 +213,7 @@ We did not write possession rules. The model learns the definition that the DFL 
 |---|---|
 | A team controls the ball | That team |
 | Pass in flight or loose ball | The team that last controlled it, until the other team gains control |
-| Challenge, duel, or brief touch | The label switches only when the evidence for the other team lasts. In the submitted file one of the 256 possessions is shorter than one second, and 6% are shorter than two seconds |
+| Challenge, duel, or brief touch | The label switches only when the evidence for the other team lasts. In the submitted file one of the 246 possessions is shorter than one second, and 6% are shorter than two seconds |
 | Ball out of play, foul, goal, or any other stoppage | Dead ball, from the whistle or the ball leaving the pitch until the restart is taken |
 | Restart (throw-in, free kick, corner, goal kick, kickoff) | The taking team, from the moment the ball is played |
 | Before the kickoff of a half | Dead ball |
@@ -220,7 +223,7 @@ We did not write possession rules. The model learns the definition that the DFL 
 1. The simulation is the weak point. The model only knows what the simulation shows it, and two wrong details cost more than any model change gained. Other gaps may remain.
 2. The label style of the provided ground truth is unknown to us. Our decoder setting is a compromise between two styles, and it loses about 0.02 spellF1 on each compared with the best setting for that style.
 3. The real validation matches come from a broadcast tracker. During replays they have no players at all, while the provided tactical tracking keeps its players, so they are close to the provided data but not the same.
-4. Stoppage boundaries are off by up to three seconds in the public window, and one false stoppage of five seconds appears.
+4. Stoppage boundaries are off by up to three seconds in the public window.
 5. Short possessions are mostly lost. The public window has one of 0.8 seconds and one of 1.3 seconds, and we miss both.
 6. The organisers call their kickoff frames playback anchors, so the dead ball rule may be off by a frame or two at the second kickoff.
 7. The networks never see the real tracker of the provided match in training. Adapting to it with pseudo-labels helped on other real matches, but we could not show that it would help here.
