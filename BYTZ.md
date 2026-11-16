@@ -221,7 +221,7 @@ We did not write possession rules. The model learns the definition that the DFL 
 ## Limitations
 
 1. The simulation is the weak point. The model only knows what the simulation shows it, and two wrong details cost more than any model change gained. Other gaps may remain.
-2. The label style of the provided ground truth is unknown to us. Our decoder setting is a compromise between two styles, and it loses about 0.02 spellF1 on each compared with the best setting for that style.
+2. The label style of the provided ground truth is unknown to us. Our decoder setting is a compromise between two styles, and it loses about 0.02 spellF1 on each compared with the best setting for that style. The errors point in opposite directions. On the real matches we predict 5,757 possessions where the labels have 5,106, and on the held-out open matches 1,698 where the labels have 2,643. Short possessions carry most of the loss: a true possession under two seconds is matched 22% of the time on the real matches and 14% on the open ones, against 87% or more for possessions over ten seconds.
 3. The real validation matches come from a broadcast tracker. During most replays they have no players at all, and during the rest only extrapolated positions, while the provided tactical tracking keeps its players, so they are close to the provided data but not the same.
 4. Stoppage boundaries are off by up to three seconds in the public window.
 5. Short possessions are mostly lost. The public window has one of 0.8 seconds and one of 1.3 seconds, and we miss both.
