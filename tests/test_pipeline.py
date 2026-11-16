@@ -61,7 +61,20 @@ def test_waiting_covers_frames_before_a_late_kickoff() -> None:
     blocks = ((100, 500), (600, 900))
     mask = waiting(1000, blocks, kickoffs=(101, 700), slack=25)
     assert not mask[:600].any()
-    assert mask[600:700].all() and not mask[700:].any()
+    assert mask[600:701].all() and not mask[701:].any()
+
+
+def test_known_dead_frames_shape_the_path() -> None:
+    # Away evidence straddles the kickoff
+    prob = np.full((300, 3), 0.05)
+    prob[:, HOME] = 0.9
+    prob[85:105] = [0.05, 0.9, 0.05]
+    known = np.zeros(300, dtype=bool)
+    known[:100] = True
+    free = decode(prob, ((0, 300),), 20.0, 0, 0)
+    held = decode(prob, ((0, 300),), 20.0, 0, 0, known)
+    assert (free[100:105] == AWAY).all()
+    assert (held[:100] == DEAD).all() and (held[100:] == HOME).all()
 
 
 def test_features_have_no_missing_values() -> None:

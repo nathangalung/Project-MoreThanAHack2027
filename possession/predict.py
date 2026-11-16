@@ -10,7 +10,7 @@ import torch
 
 from possession.broadcast import target_match
 from possession.decode import decode, waiting
-from possession.match import DEAD, LABELS
+from possession.match import LABELS
 from possession.metrics import macro_f1, spell_f1
 from possession.model import PossessionNet, predict_match
 from possession.paths import FPS, KICKOFFS, MODEL_DIR, PUBLIC_GT, RESULTS_DIR, TEAM
@@ -50,10 +50,8 @@ def run(
     match = target_match()
     prob = predict_match(load_models(list(models), device), match, device)
     settings = json.loads((MODEL_DIR / f"{decoder}.json").read_text())
-    labels = decode(prob, match.blocks, **settings)
-
     # Dead ball before each kickoff
-    labels[waiting(match.n_frames, match.blocks, KICKOFFS, FPS)] = DEAD
+    labels = decode(prob, match.blocks, **settings, known_dead=waiting(match.n_frames, match.blocks, KICKOFFS, FPS))
 
     text = np.full(match.n_frames, "X")
     for start, stop in match.blocks:

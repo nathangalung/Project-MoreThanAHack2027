@@ -62,12 +62,25 @@ def waiting(n_frames: int, blocks: tuple[tuple[int, int], ...], kickoffs: tuple[
         # Anchors are exact within slack
         late = [frame for frame in kickoffs if start + slack < frame < stop]
         if late:
-            mask[start : late[0]] = True
+            # Anchor frame is still dead
+            mask[start : late[0] + 1] = True
     return mask
 
 
 def decode(
-    prob: np.ndarray, blocks: tuple[tuple[int, int], ...], penalty: float, min_spell: int, min_dead: int
+    prob: np.ndarray,
+    blocks: tuple[tuple[int, int], ...],
+    penalty: float,
+    min_spell: int,
+    min_dead: int,
+    known_dead: np.ndarray | None = None,
 ) -> np.ndarray:
     """Labels for every block frame."""
-    return tidy(best_paths(prob, blocks, penalty), blocks, min_spell, min_dead)
+    if known_dead is not None:
+        # Path must respect known stoppages
+        prob = prob.copy()
+        prob[known_dead] = np.eye(prob.shape[1], dtype=prob.dtype)[DEAD]
+    labels = tidy(best_paths(prob, blocks, penalty), blocks, min_spell, min_dead)
+    if known_dead is not None:
+        labels[known_dead] = DEAD
+    return labels

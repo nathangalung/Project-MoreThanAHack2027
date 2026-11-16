@@ -149,7 +149,7 @@ We also tried three changes to the adaptation itself, on ten of the real matches
 
 We did not adopt the step, for three reasons.
 
-1. Half of the gain does not carry over. The SkillCorner tracker reports no players at all while the broadcast shows a replay, and half of the gain in spellF1 comes from those frames (0.007 of 0.0145). The provided tactical tracking keeps its players during replays, so that half has nothing to work on.
+1. Half of the gain does not carry over. On about 70% of the frames where the broadcast shows a replay, the SkillCorner data has no players at all, and on the rest it only carries extrapolated positions that the tracker did not see. Half of the gain in spellF1 comes from the frames without players (0.007 of 0.0145). The provided tactical tracking keeps its players during replays, so that half has nothing to work on.
 2. On the data built to resemble the provided match, the degraded open matches, the step changes nothing.
 3. The step has a cost. It adds a stage that cannot be checked on the provided match, and it would put weights trained on the provided tracking into a public repository.
 
@@ -162,7 +162,7 @@ The public window was not part of this choice, but it is why we looked closer. W
 | Rule | Reason |
 |---|---|
 | Frames outside the two graded blocks are labelled `X` | They are not scored |
-| Graded frames before the kickoff of a half are dead ball | The organisers state that the second graded block starts 2,934 frames before the kickoff and that all of those frames are dead ball. The kickoff frames are the anchors they publish in `games.py`. A block that starts within one second of its kickoff, like the first half, is left as it is |
+| Graded frames before the kickoff of a half are dead ball | The organisers state that the second graded block starts 2,934 frames before the kickoff and that all of those frames are dead ball. The kickoff frames are the anchors they publish in `games.py`. A block that starts within one second of its kickoff, like the first half, is left as it is. The decoder is given these frames as dead ball before it searches for the path, so a possession cannot start before the kickoff and run across it |
 
 ## Assets Used and Dropped
 
@@ -213,7 +213,7 @@ We did not write possession rules. The model learns the definition that the DFL 
 |---|---|
 | A team controls the ball | That team |
 | Pass in flight or loose ball | The team that last controlled it, until the other team gains control |
-| Challenge, duel, or brief touch | The label switches only when the evidence for the other team lasts. In the submitted file one of the 246 possessions is shorter than one second, and 6% are shorter than two seconds |
+| Challenge, duel, or brief touch | The label switches only when the evidence for the other team lasts. In the submitted file none of the 245 possessions is shorter than one second, and 6% are shorter than two seconds |
 | Ball out of play, foul, goal, or any other stoppage | Dead ball, from the whistle or the ball leaving the pitch until the restart is taken |
 | Restart (throw-in, free kick, corner, goal kick, kickoff) | The taking team, from the moment the ball is played |
 | Before the kickoff of a half | Dead ball |
@@ -222,12 +222,13 @@ We did not write possession rules. The model learns the definition that the DFL 
 
 1. The simulation is the weak point. The model only knows what the simulation shows it, and two wrong details cost more than any model change gained. Other gaps may remain.
 2. The label style of the provided ground truth is unknown to us. Our decoder setting is a compromise between two styles, and it loses about 0.02 spellF1 on each compared with the best setting for that style.
-3. The real validation matches come from a broadcast tracker. During replays they have no players at all, while the provided tactical tracking keeps its players, so they are close to the provided data but not the same.
+3. The real validation matches come from a broadcast tracker. During most replays they have no players at all, and during the rest only extrapolated positions, while the provided tactical tracking keeps its players, so they are close to the provided data but not the same.
 4. Stoppage boundaries are off by up to three seconds in the public window.
 5. Short possessions are mostly lost. The public window has one of 0.8 seconds and one of 1.3 seconds, and we miss both.
 6. The organisers call their kickoff frames playback anchors, so the dead ball rule may be off by a frame or two at the second kickoff.
 7. The networks never see the real tracker of the provided match in training. Adapting to it with pseudo-labels helped on other real matches, but we could not show that it would help here.
 8. With more time, we would measure real broadcast cutaway timing on matches that have both a broadcast and labels.
+9. A last check of the inputs found three differences that the simulation does not cover. A track of the provided match sometimes carries the wrong team: the home team shows more than 11 players on 8% of frames. The two ball tracks are more than 10 metres apart on 7% of the frames where both are seen, against 1% in the simulation. Some replays keep a valid homography and so count as live. We found these too late to test a change.
 
 ## Reproduction
 
