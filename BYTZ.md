@@ -148,6 +148,8 @@ We also tried three changes to the adaptation itself, on ten of the real matches
 | Mixing batches of degraded open data into the adaptation | 0.0057 worse than plain adaptation. It pulls the networks back toward the simulation |
 | Learning the probabilities of the networks, not their decoded labels | No gain over the networks before adaptation. The confident decoded labels are what helps |
 
+Later we also doubled the number of steps to 1,600, on all 20 real matches with two networks. The gain of the team split was 0.0075, against 0.0085 with 800 steps, so the 800 steps stay.
+
 At first we did not adopt the step, for three reasons.
 
 1. Half of the gain does not carry over. On about 70% of the frames where the broadcast shows a replay, the SkillCorner data has no players at all, and on the rest it only carries extrapolated positions that the tracker did not see. Half of the gain in spellF1 comes from the frames without players (0.007 of 0.0145). The provided tactical tracking keeps its players during replays, so that half has nothing to work on.
