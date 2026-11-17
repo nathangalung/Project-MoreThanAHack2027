@@ -67,6 +67,16 @@ def waiting(n_frames: int, blocks: tuple[tuple[int, int], ...], kickoffs: tuple[
     return mask
 
 
+def adapted_teams(prob: np.ndarray, adapted: np.ndarray) -> np.ndarray:
+    """Team split from adapted networks."""
+    # Stoppage probability stays as is
+    live = adapted[:, :DEAD]
+    split = live / np.maximum(live.sum(axis=1, keepdims=True), 1e-6)
+    out = prob.copy()
+    out[:, :DEAD] = split * (1 - prob[:, DEAD : DEAD + 1])
+    return out
+
+
 def decode(
     prob: np.ndarray,
     blocks: tuple[tuple[int, int], ...],

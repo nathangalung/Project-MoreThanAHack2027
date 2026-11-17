@@ -1,4 +1,4 @@
-"""Optional adaptation, tested, not adopted."""
+"""Adapt networks to the match."""
 
 import argparse
 import copy

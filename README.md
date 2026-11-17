@@ -21,7 +21,7 @@ The organiser documents are kept unchanged in `docs/`, and the scorer, the valid
 7. Choose the decoder setting on matches that are never trained on: two held-out open matches, and 20 open matches with real automatic tracking (SkillCorner open data, MIT licence).
 8. Label every graded frame before the kickoff of a half as dead ball. The kickoff frames are the anchors the organisers publish in `games.py`.
 
-No label from the target match is used for training or tuning. The public 5 minutes are only printed as a check after the file is written.
+No ground truth label from the target match is used for training or tuning. A last step adapts the networks to the target match with their own confident predictions, and the adapted networks only decide which team has the ball. The public 5 minutes are only printed as a check after the file is written.
 
 ## Results
 
@@ -29,8 +29,8 @@ No label from the target match is used for training or tuning. The public 5 minu
 |---|---|---|
 | spellF1 | 20 real matches with automatic tracking, never trained on | 0.6712 |
 | spellF1 | Two held-out open matches, degraded | 0.6497 |
-| spellF1 | Public window of the target match | 0.6667 |
-| macroF1 | Public window of the target match | 0.9259 |
+| spellF1 | Public window of the target match | 0.6533 |
+| macroF1 | Public window of the target match | 0.9263 |
 
 The public window has 17 possessions and a noise band of about 0.33 on spellF1, so it is a check and not a measure. `BYTZ.md` has the full account.
 
@@ -63,7 +63,7 @@ The public window has 17 possessions and a noise band of about 0.33 on spellF1, 
 | Tactical homography | The camera centre follows the ball along the pitch (correlation 0.83) but is 12 metres off on median, about what the player centroid already gives | Tried, not used |
 | Tactical audio | Whistle tones are detectable, but in the public window they gave 3 hits, 3 false alarms, and 2 missed stoppages. The open matches have no audio, so this is the only check we could make, and it is the one choice that rests on the public window | Tried, not used |
 | Video frames | Ball detection could gain at most 0.020 spellF1 with a perfect detector, because the ball is already visible on all but 2.5% of the frames predicted live | Measured, not built |
-| Target tracking without labels | Networks that adapt to a real match with their own confident labels gain 0.014 spellF1 on real matches. Half of that comes from frames with no players, which the target tracking does not have, and on data built like the target the step changes nothing | Tested, not adopted. `BYTZ.md` has the numbers |
+| Target tracking without labels | Networks that adapt to a real match with their own confident labels gain 0.014 spellF1 on real matches. Half of that comes from frames with no players, which the target tracking does not have, and on data built like the target the step changes nothing. The gain that carries over is in the team decision: with the stoppage decision left to the original networks, the gain is 0.009 on real matches and 0.003 on data built like the target | Adopted for the team decision only. `BYTZ.md` has the numbers |
 
 ## Folder Layout
 
@@ -100,6 +100,7 @@ Run the cells from top to bottom. Clear the outputs before committing, because t
 uv sync
 uv run pytest
 uv run possession/train.py
+uv run possession/adapt.py
 uv run possession/predict.py
 uv run evaluation/validate_submission.py evaluation/results/BYTZ.csv
 uv run evaluation/run_evaluation.py
@@ -110,7 +111,8 @@ uv run evaluation/run_evaluation.py
 | `uv sync` | Installs the pinned dependencies from `uv.lock` | A few minutes |
 | `uv run pytest` | Checks the metric against the scorer, and the decoder, features, and degradation | Seconds |
 | `train.py` | Downloads the open matches on first use (about 4.3 GB), fits five networks on five matches, tunes the decoder on the two held-out matches and the 20 real matches, then refits the networks on all seven and saves `models/model.pt` and `models/model_decoder.json` | About 4 to 5 hours |
-| `predict.py` | Writes `evaluation/results/BYTZ.csv` and prints the public window score | About 10 minutes |
+| `adapt.py` | Trains each network 800 more steps on its own confident labels of the provided match and saves `models/model_adapted.pt` | About 10 minutes |
+| `predict.py` | Writes `evaluation/results/BYTZ.csv` and prints the public window score. The stoppage decision comes from `model.pt` and the team decision from `model_adapted.pt` | About 20 minutes |
 | `validate_submission.py` | Runs the official format checks | Seconds |
 | `run_evaluation.py` | Prints the official board on the public window | Seconds |
 
@@ -118,12 +120,12 @@ For a quick check that everything runs, use a short training first. It still dow
 
 ```bash
 uv run possession/train.py --epochs 4 --steps 60 --seeds 0 --name smoke
-uv run possession/predict.py --models smoke --decoder smoke_decoder --out evaluation/results/smoke.csv
+uv run possession/predict.py --models smoke --decoder smoke_decoder --adapted "" --out evaluation/results/smoke.csv
 ```
 
 ## Reproducing the Submitted File
 
-An earlier version of the training gave byte identical weights when run twice on our machine. A different GPU or driver may not, so the trained weights are committed in `models/`, and the submitted file is regenerated from them:
+An earlier version of the training gave byte identical weights when run twice on our machine. A different GPU or driver may not, so the trained weights and the adapted weights are committed in `models/`, and the submitted file is regenerated from them:
 
 ```bash
 uv run possession/predict.py
@@ -147,7 +149,7 @@ uv run possession/predict.py
 | `possession/decode.py` | Viterbi decoder and short run removal |
 | `possession/metrics.py` | spellF1 and macroF1 for tuning on open matches |
 | `possession/train.py` | Training on fresh degraded copies each epoch, and decoder tuning on both validation sets |
-| `possession/adapt.py` | Optional adaptation to the target match with pseudo-labels, tested and not adopted |
+| `possession/adapt.py` | Adaptation to the target match with pseudo-labels, used for the team decision |
 | `possession/predict.py` | Submission writer |
 | `tests/test_metrics.py` | Compares our metric with the official scorer |
 | `tests/test_pipeline.py` | Checks the decoder, features, and degradation |

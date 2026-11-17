@@ -5,7 +5,7 @@ from dataclasses import replace
 import numpy as np
 import polars as pl
 
-from possession.decode import decode, drop_short, viterbi, waiting
+from possession.decode import adapted_teams, decode, drop_short, viterbi, waiting
 from possession.degrade import carry_dead_ball, degrade, runs, smooth
 from possession.dfl import club_ids, squads
 from possession.features import FEATURE_NAMES, N_FEATURES, match_features
@@ -75,6 +75,15 @@ def test_known_dead_frames_shape_the_path() -> None:
     held = decode(prob, ((0, 300),), 20.0, 0, 0, known)
     assert (free[100:105] == AWAY).all()
     assert (held[:100] == DEAD).all() and (held[100:] == HOME).all()
+
+
+def test_adapted_teams_keeps_the_stoppage_probability() -> None:
+    prob = np.array([[0.5, 0.1, 0.4], [0.1, 0.1, 0.8]])
+    adapted = np.array([[0.1, 0.3, 0.6], [0.0, 0.0, 1.0]])
+    out = adapted_teams(prob, adapted)
+    assert np.allclose(out[:, DEAD], prob[:, DEAD])
+    assert np.allclose(out.sum(axis=1), [1.0, 0.8])
+    assert np.allclose(out[0, :DEAD], [0.15, 0.45])
 
 
 def test_features_have_no_missing_values() -> None:

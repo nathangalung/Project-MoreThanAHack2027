@@ -9,7 +9,7 @@ import polars as pl
 import torch
 
 from possession.broadcast import target_match
-from possession.decode import decode, waiting
+from possession.decode import adapted_teams, decode, waiting
 from possession.match import LABELS
 from possession.metrics import macro_f1, spell_f1
 from possession.model import PossessionNet, predict_match
@@ -19,6 +19,8 @@ from possession.train import NAME
 CODES = {"H": 0, "A": 1, "D": 2, "X": 3}
 # CPU repeats exactly, CUDA not
 DEVICE = "cpu"
+# Networks adapted to the match
+ADAPTED = f"{NAME}_adapted"
 
 
 def load_models(names: list[str], device: str) -> list[PossessionNet]:
@@ -45,10 +47,14 @@ def run(
     decoder: str = f"{NAME}_decoder",
     device: str = DEVICE,
     out: Path = RESULTS_DIR / f"{TEAM}.csv",
+    adapted: str = ADAPTED,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Write the file, return labels."""
     match = target_match()
     prob = predict_match(load_models(list(models), device), match, device)
+    if adapted:
+        # Adapted networks only pick teams
+        prob = adapted_teams(prob, predict_match(load_models([adapted], device), match, device))
     settings = json.loads((MODEL_DIR / f"{decoder}.json").read_text())
     # Dead ball before each kickoff
     labels = decode(prob, match.blocks, **settings, known_dead=waiting(match.n_frames, match.blocks, KICKOFFS, FPS))
@@ -69,8 +75,9 @@ def main() -> None:
     parser.add_argument("--decoder", default=f"{NAME}_decoder")
     parser.add_argument("--device", choices=["cpu", "cuda"], default=DEVICE, help="cpu repeats exactly, cuda may not")
     parser.add_argument("--out", type=Path, default=RESULTS_DIR / f"{TEAM}.csv")
+    parser.add_argument("--adapted", default=ADAPTED, help="empty string skips the adapted networks")
     args = parser.parse_args()
-    run(tuple(args.models), args.decoder, args.device, args.out)
+    run(tuple(args.models), args.decoder, args.device, args.out, args.adapted)
 
 
 if __name__ == "__main__":
