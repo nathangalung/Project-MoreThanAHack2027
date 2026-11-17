@@ -6,11 +6,12 @@ import numpy as np
 import polars as pl
 import pytest
 
-from possession.decode import adapted_teams, decode, drop_short, viterbi, waiting
+from possession.decode import decode, drop_short, viterbi, waiting
 from possession.degrade import carry_dead_ball, degrade, runs, smooth
 from possession.dfl import club_ids, squads
 from possession.features import FEATURE_NAMES, N_FEATURES, interpolate, match_features
 from possession.match import AWAY, DEAD, HOME, Match, mirrored
+from possession.metrics import spell_f1
 from possession.skillcorner import hold, upsample
 from possession.train import tune_decoder
 
@@ -76,15 +77,6 @@ def test_known_dead_frames_shape_the_path() -> None:
     held = decode(prob, ((0, 300),), 20.0, 0, 0, known)
     assert (free[100:105] == AWAY).all()
     assert (held[:100] == DEAD).all() and (held[100:] == HOME).all()
-
-
-def test_adapted_teams_keeps_the_stoppage_probability() -> None:
-    prob = np.array([[0.5, 0.1, 0.4], [0.1, 0.1, 0.8]])
-    adapted = np.array([[0.1, 0.3, 0.6], [0.0, 0.0, 1.0]])
-    out = adapted_teams(prob, adapted)
-    assert np.allclose(out[:, DEAD], prob[:, DEAD])
-    assert np.allclose(out.sum(axis=1), [1.0, 0.8])
-    assert np.allclose(out[0, :DEAD], [0.15, 0.45])
 
 
 def test_features_have_no_missing_values() -> None:
@@ -155,9 +147,13 @@ def test_decoder_tuning_balances_both_groups() -> None:
     fine = prob.argmax(axis=1).astype(np.int8)
     matches = [replace(toy_match(1000), blocks=blocks, label=label) for label in (fine, coarse)]
     best, scores = tune_decoder([[prob], [prob]], [[matches[0]], [matches[1]]])
-    alone = [tune_decoder([[prob]], [[match]])[1][0] for match in matches]
-    assert alone == [1.0, 1.0]
-    assert max(1.0 - score for score in scores) < 1.0
+    alone = [tune_decoder([[prob]], [[match]]) for match in matches]
+    assert [score for _, (score,) in alone] == [1.0, 1.0]
+    # Best setting of one group
+    for setting, _ in alone:
+        labels = decode(prob, blocks, **setting)
+        worst = min(spell_f1(match.label, labels, blocks) for match in matches if match.label is not None)
+        assert min(scores) >= worst
     assert set(best) == {"penalty", "min_spell", "min_dead"}
 
 

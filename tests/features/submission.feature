@@ -1,5 +1,5 @@
 Feature: Submission File
-  The pipeline writes one label per video frame.
+  One label per video frame.
 
   Scenario: Every Frame Gets a Label
     Given a match with two graded halves
@@ -20,6 +20,7 @@ Feature: Submission File
     And trained and adapted networks
     When the prediction runs without the adapted networks
     Then the file has one row per frame
+    And no adapted weights were needed
 
   Scenario: Adapted Networks Only Split the Teams
     Given frame probabilities from the trained networks
@@ -28,9 +29,10 @@ Feature: Submission File
     Then the dead ball probability is unchanged
     And the live probability follows the adapted team split
 
-  Scenario: Networks Adapt Without Ground Truth
+  Scenario: Networks Adapt on Confident Pseudo-Labels
     Given a match with two graded halves
     And trained and adapted networks
     When the networks adapt to the match
     Then adapted weights are saved for every network
     And frames before a kickoff are left out of the pseudo-labels
+    And frames under the confidence threshold are left out

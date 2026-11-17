@@ -8,7 +8,7 @@ More than a Hack 2027, Phase 1: Ball Possession.
 
 ## Summary
 
-We label each frame as home possession, away possession, or dead ball with an average of five sequence models that never saw a ground truth label from the provided match. Each model is trained on seven open matches from the German Bundesliga and 2. Bundesliga that carry a possession label for every frame. The open tracking has every player and the ball on almost every frame, so before training we degrade it until it looks like the automatic tracking of the provided match. A Viterbi decoder then turns frame probabilities into whole possessions, because the ranking metric counts possessions and not frames. The decoder is tuned on matches that are never trained on, including 20 open matches with real automatic tracking. No label from the provided match is used for training. Its tracking, without labels, was used in two ways: to set how the open data is degraded, and for a last step in which the networks adapt to the match with their own confident predictions. The adapted networks only split the live probability between the two teams. The dead ball probability comes from the networks trained on open data.
+We label each frame as home possession, away possession, or dead ball with an average of five sequence models that never saw a ground truth label from the provided match. Each model is trained on seven open matches from the German Bundesliga and 2. Bundesliga that carry a possession label for every frame. The open tracking has every player and the ball on almost every frame, so before training we degrade it until it looks like the automatic tracking of the provided match. A Viterbi decoder then turns frame probabilities into whole possessions, because the ranking metric counts possessions and not frames. The decoder is tuned on matches that are never trained on, including 20 open matches with real automatic tracking. No ground truth label from the provided match is used for training. Its tracking, without labels, was used in two ways: to set how the open data is degraded, and for a last step in which the networks adapt to the match with their own confident predictions. The adapted networks only split the live probability between the two teams. The dead ball probability comes from the networks trained on open data.
 
 | Measure | Where It Is Measured | Value |
 |---|---|---|
@@ -23,17 +23,18 @@ The scores on the open matches are biased upward. The decoder setting was chosen
 
 Late in the work we found that two of the seven open matches carry three referee tracks each, and that our loader had counted them as away players. One of the two is a held-out match. We left the referees out and trained again. With the same decoder setting, the score on the real matches rose from 0.6637 to 0.6712. The table above, the decoder table, and the ensemble sizes are measured with the final networks. The tests of single design choices further down were run before this change, so their absolute scores are lower. Each of them compares two variants under the same conditions.
 
-The public window has only 17 possessions. The official bootstrap gives a noise band of about 0.33 on its spellF1, so it cannot separate two models. We printed it after each run as a check that the pipeline works. The model, the decoder, and the number of networks were chosen on the other two validation sets. The public window still touched the work in five places, and we list them so a reader can judge.
+The public window has only 17 possessions. The official bootstrap gives a noise band of about 0.33 on its spellF1, so it cannot separate two models. We printed it after each run as a check that the pipeline works. The model, the decoder, and the number of networks were chosen on the other two validation sets. The public window still touched the work in six places, and we list them so a reader can judge.
 
 | Where | What the Public Window Did | What the Decision Rests On |
 |---|---|---|
 | Frozen ball in the simulation | A dead ball recall of 32% in the window showed that something was wrong | The open data freezes the ball at a speed of exactly zero, and the provided tracking does not. That is a fact about the inputs |
 | Broadcast cutaways as an input | We first saw there that cutaways line up with stoppages | A controlled test on held-out open matches |
-| Whistle detection from audio | It gave 3 hits, 3 false alarms, and 2 misses in the window, and we dropped it | Only the window. The open matches have no audio, so no other check was possible |
+| Whistle detection from audio | It gave 3 hits, 3 false alarms, and 2 misses in the window, and we dropped it | Only the window. The open matches have no audio, so no other check was possible, and the networks could not have learned an audio input from them either |
+| Decoder switch cost | We printed the window score for several costs | The two validation sets only. The printed scores did not enter the choice |
 | Training on real matches as well | We counted the brief possessions in the window (three of 17 last under three seconds between two possessions of the other team). No model was scored | The count showed that the challenge keeps brief possessions, which the mixed training removes. It closed an idea and changed nothing in the submitted model |
 | Adaptation step | A lower score in the window made us look closer | The split of the gain by frame type and by part of the decision on the real matches, and the test on held-out open matches |
 
-The gains we report for single design choices lie between 0.005 and 0.02 spellF1. They are measured over 20 matches, where the paired standard error is about 0.003. On the one scored match the organisers give a noise band of about 0.04, so no single one of them would be visible there.
+The gains we report for single design choices lie between 0.004 and 0.03 spellF1. Each is measured on the 20 real matches, where the paired standard error is about 0.003, or on the held-out open matches, as stated with the gain. Limitations 4 and 5 also describe errors that we saw in the public window. On the one scored match the organisers give a noise band of about 0.04, so no single one of them would be visible there.
 
 ## Approach
 
@@ -51,14 +52,14 @@ The open tracking comes from the calibrated multi-camera system of the league. T
 |---|---|
 | Ball missing in stretches of several seconds, more often during stoppages and when the ball is high or off the pitch | Ball hidden in random stretches with those same biases |
 | The ball is never visible for only a few frames, and it rarely drops out for a single frame | Ball tracks shorter than 15 to 50 frames are removed, and single frame gaps are rare |
-| Positions much smoother than the open data | Gaussian blur along time that ignores missing frames, with a width of 4 to 9 frames for the ball |
+| Positions smoother than the open data | Gaussian blur along time that ignores missing frames, with a width of 4 to 9 frames for the ball |
 | Player tracks drop out, and 33 stretches lose most tracks at once | Random track loss and simulated camera loss |
 | No player identities, only a team per track | Features only use sets of players per team |
 | Only the two teams are tracked. Two of the open matches also carry three referee tracks each | Referee tracks are left out when the open matches are loaded |
 | Ball keeps moving during a stoppage, because a player carries it to the restart spot. The open data freezes it with a speed of exactly zero | Frozen ball replaced by a path that visits nearby players and ends at the restart spot |
 | Two cameras disagree about the ball, mostly when it is in the air | A second ball track is simulated from another camera position using the real ball height in the open data, with a calibration error that drifts over time and a time shift of up to three frames |
 | Broadcast cuts to replays and close-ups, mostly during stoppages | Cutaways simulated around dead ball stretches, plus a few during live play |
-| Positions are a few metres off centre | Random shift of all positions by up to 2.5 metres |
+| Positions are off centre by a constant shift | Random shift of all positions by up to 2.5 metres |
 | Either team can attack either way | Random flips of both axes and random swap of home and away |
 
 Two findings changed the result more than any model change.
@@ -74,7 +75,7 @@ Two findings changed the result more than any model change.
 | Share of visible runs under 4 frames | 0% | 2% to 13% | 0% |
 | 99th percentile of ball acceleration in m/s² | 32 | 62 to 288 | 31 to 92 |
 
-The ranges cover several random copies of the open matches.
+The ranges cover 21 random copies of the open matches.
 
 On the 20 real matches, the average of two networks rose from 0.591 to 0.610 spellF1 after this change, and both single networks improved.
 
@@ -119,7 +120,7 @@ The two validation sets want different settings, because they label possession d
 | 60 | 0.5939 | 0.6862 |
 | 120 | 0.5202 | 0.6631 |
 
-Each cell is the best score over the minimum lengths, and the table leaves out some costs. The best score anywhere in the grid is 0.6742 for DFL (cost 2) and 0.6862 for SkillCorner (cost 60). We keep the setting whose larger loss against these two is smallest. That is a switch cost of 20 with no minimum length. It scores 0.6497 on DFL and 0.6712 on SkillCorner, a loss of 0.025 on DFL and 0.015 on SkillCorner. This rule was set on these two sets only. We also looked at the public window score for several costs as a check, and did not use it for the choice.
+Each cell is the best score over the minimum lengths, and the table leaves out some costs. The best score anywhere in the grid is 0.6742 for DFL (cost 2) and 0.6862 for SkillCorner (cost 60). We keep the setting whose larger loss against these two is smallest. That is a switch cost of 20 with no minimum length. It scores 0.6497 on DFL and 0.6712 on SkillCorner, a loss of 0.025 on DFL and 0.015 on SkillCorner. This rule was set on these two sets only. We also printed the public window score for several costs as a check, and did not use it for the choice.
 
 ### Adapting to the Provided Match
 
@@ -130,7 +131,7 @@ The simulation can only approximate the real tracker. The rules allow one way to
 3. Each network is trained for 800 more steps on the kept frames, with the eight mirrored views as augmentation.
 4. The adapted networks predict the match again.
 
-We could test this step on other matches, because each real SkillCorner match can play the part of the provided match: the networks adapt to it without its labels, and the labels are only used to score afterwards. The steps and the threshold were set after the first test. The only later change we tried is the test of 1,600 steps below.
+We could test this step on other matches, because each real SkillCorner match can play the part of the provided match: the networks adapt to it without its labels, and the labels are only used to score afterwards. The steps and the threshold were set after the first test. The only later change to the steps or the threshold that we tried is the test of 1,600 steps below.
 
 | Test | Before | After | Change |
 |---|---|---|---|
@@ -179,7 +180,7 @@ The submitted file, with the team split from the adapted networks, agrees with t
 | Rule | Reason |
 |---|---|
 | Frames outside the two graded blocks are labelled `X` | They are not scored |
-| Graded frames before the kickoff of a half are dead ball | The organisers state that the second graded block starts 2,934 frames before the kickoff and that all of those frames are dead ball. The kickoff frames are the anchors they publish in `games.py`. A block that starts within one second of its kickoff, like the first half, is left as it is. The decoder is given these frames as dead ball before it searches for the path, so a possession cannot start before the kickoff and run across it |
+| Graded frames up to and including the kickoff frame of a half are dead ball | The organisers state that the second graded block starts 2,934 frames before the kickoff and that all of those frames are dead ball. The kickoff frames are the anchors they publish in `games.py`. A block that starts within one second of its kickoff, like the first half, is left as it is. The decoder is given these frames as dead ball before it searches for the path, so a possession cannot start before the kickoff and run across it |
 
 ## Assets Used and Dropped
 
@@ -192,7 +193,7 @@ The submitted file, with the team split from the adapted networks, agrees with t
 | Tactical homography | No | The camera centre follows the ball (correlation 0.83) but is 12 metres off on median, which the player centroid already gives |
 | Tactical audio | No | Whistle detection gave 3 hits, 3 false alarms, and 2 misses in the public window. That is the only check we could make, because the open matches have no audio |
 | Video frames | No | We measured what ball detection could give at best before building it. On held-out open matches, revealing every hidden ball during live play raises spellF1 by 0.020, half of them by 0.010, and with false detections in 30% of gaps the gain is gone. In the provided match both cameras miss the ball on 36% of graded frames, but only 2.5% of graded frames are predicted live with the ball hidden (measured with an earlier three-network model). The gaps lie in stoppages, where a found ball does not change the label |
-| Public ground truth | Check only | Printed after the file is written. Never used for training or to tune a setting. The summary lists the five places where it still touched the work |
+| Public ground truth | Check only | Printed after the file is written. Never used for training or to tune the model or the decoder. The summary lists the six places where it still touched the work |
 
 In a controlled test on held-out open matches, single networks without the broadcast inputs scored 0.6357 and 0.6291 for two random seeds, against 0.6636 and 0.6497 with them, so we kept them. The test ran before the last simulation change. The gain is measured on simulated cutaways and a simulated second camera, so it shows that the model can use these inputs, not how large the gain is on the provided match.
 
@@ -201,7 +202,7 @@ In a controlled test on held-out open matches, single networks without the broad
 | Idea | Result |
 |---|---|
 | Extra outputs that predict the hidden ball position and the possession boundaries | No gain on held-out open matches |
-| Training on the real SkillCorner matches as well | Two networks trained on five open matches and 14 real matches were compared with the same two seeds trained on open matches only. On six held-out real matches spellF1 rose from 0.669 to 0.772 at the chosen switch cost. That gain is measured on the same tracker and the same automatic labels as the added training data, so it does not show transfer. On data from other sources the networks got worse at every switch cost: by 0.008 to 0.036 on the held-out open matches, and by 0.018 to 0.025 on two degraded matches from the open sample data of Metrica Sports, which neither pair trained on. With a 13% share of real matches (3 real samples against 20 degraded open copies per epoch) the picture was the same: 0.751 on the held-out real matches, but 0.014 lower on the held-out open matches and 0.013 lower on the Metrica matches at the chosen switch cost. It would also leave no real match that the model has never seen. We then looked at what the real matches teach. Their labels hold fewer brief possessions: 7% of their possessions last under three seconds between two possessions of the other team, against 25% in the open matches. When such possessions were merged in the open labels, the mixed networks scored 0.019 to 0.032 higher than the open-only networks on the held-out open matches. So the mixed training moves the model to a coarser definition. The five public minutes contain three such brief possessions among 17, so the challenge does not use the coarser definition. Not adopted |
+| Training on the real SkillCorner matches as well | Two networks trained on five open matches and 14 real matches were compared with the same two seeds trained on open matches only. On six held-out real matches spellF1 rose from 0.669 to 0.772 at the chosen switch cost. That gain is measured on the same tracker and the same automatic labels as the added training data, so it does not show transfer. On data from other sources the networks got worse at every switch cost: by 0.008 to 0.036 on the held-out open matches, and by 0.018 to 0.025 on two degraded matches from the open sample data of Metrica Sports, which neither pair trained on. With a 13% share of real matches (3 real samples against 20 degraded open copies per epoch) the picture was the same: 0.751 on the held-out real matches, but 0.014 lower on the held-out open matches and 0.013 lower on the Metrica matches at the chosen switch cost. It would also leave no real match that the model has never seen. We then looked at what the real matches teach. Their labels hold fewer brief possessions: 7% of their possessions last under three seconds between two possessions of the other team, against 25% in the open matches. When such possessions were merged in the open labels, the mixed networks scored 0.019 to 0.032 higher than the open-only networks on the held-out open matches. So the mixed training moves the model to a coarser definition. The five public minutes contain three such brief possessions among 17, which fits the finer definition and not the coarser one. With 17 possessions this is only a hint. The losses on the held-out open matches and the Metrica matches are the reason it is not adopted |
 | Separate switch costs for team changes and for stoppages, since the two label styles should only disagree about team changes | Tested on the saved validation predictions of an earlier three-network model. The larger loss fell from 0.025 to 0.024, which is no real gain, so the single cost stays |
 | Longer training (40 epochs instead of 24) and a wider network (256 hidden units instead of 160) | On the real matches a single network scored 0.608 and 0.609, against 0.616 for the same seed with the submitted settings. No gain, so the submitted setting stays |
 | Training on labels without brief touches: a possession of under two seconds between two possessions of the other team is merged into them, to teach the definition of the challenge directly | With two networks, the best score on the real matches fell from 0.679 to 0.669, and at the chosen switch cost it stayed at 0.656. On the original open labels it fell from 0.640 to 0.599. The networks only learn the smoothing that the decoder already does |

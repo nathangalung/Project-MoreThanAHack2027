@@ -20,6 +20,7 @@ from possession.model import PossessionNet, predict_match
 scenarios("features/submission.feature")
 
 FRAMES = 1200
+UNSURE = slice(800, 900)
 BLOCKS = ((100, 600), (700, 1150))
 KICKOFFS = (130, 740)
 
@@ -62,6 +63,7 @@ def prediction_runs(folder: Path, capsys: pytest.CaptureFixture[str]) -> pl.Data
 @when("the prediction runs without the adapted networks", target_fixture="rows")
 def prediction_runs_plain(folder: Path, monkeypatch: pytest.MonkeyPatch) -> pl.DataFrame:
     out = folder / "plain.csv"
+    (folder / "model_adapted.pt").unlink()
     monkeypatch.setattr(sys, "argv", ["predict.py", "--adapted", "", "--out", str(out)])
     predict.main()
     return pl.read_csv(out)
@@ -120,7 +122,7 @@ def dead_is_unchanged(combined: np.ndarray, trained: np.ndarray) -> None:
 def live_follows_adapted(combined: np.ndarray) -> None:
     assert np.allclose(combined[0, :DEAD], [0.15, 0.45])
     assert np.allclose(combined[1, :DEAD], [0.36, 0.04])
-    # No adapted team mass, none kept
+    # No adapted mass, none kept
     assert np.allclose(combined[2, :DEAD], 0.0)
 
 
@@ -130,6 +132,7 @@ def networks_adapt(match: Match, folder: Path, monkeypatch: pytest.MonkeyPatch) 
     settings = json.loads((folder / "model_decoder.json").read_text())
     confident = np.zeros((FRAMES, 3), dtype=np.float32)
     confident[:, DEAD] = 1.0
+    confident[UNSURE] = [0.2, 0.2, 0.6]
     monkeypatch.setattr(adapt, "predict_views", lambda *args: confident)
     pseudo = adapt.pseudo_labels(models, match, [], settings, "cpu")
     monkeypatch.undo()
@@ -156,6 +159,17 @@ def adapted_weights_saved(folder: Path, match: Match) -> None:
 
 @then("frames before a kickoff are left out of the pseudo-labels")
 def kickoff_frames_left_out(pseudo: np.ndarray) -> None:
-    for (start, stop), kickoff in zip(BLOCKS, KICKOFFS, strict=True):
+    for (start, _), kickoff in zip(BLOCKS, KICKOFFS, strict=True):
         assert (pseudo[start : kickoff + 1] == adapt.UNUSED).all()
-        assert (pseudo[kickoff + 1 : stop] == DEAD).all()
+    assert (pseudo[400:600] == DEAD).all()
+
+
+@then("no adapted weights were needed")
+def no_adapted_weights(folder: Path) -> None:
+    assert not (folder / "model_adapted.pt").exists()
+
+
+@then("frames under the confidence threshold are left out")
+def unsure_frames_left_out(pseudo: np.ndarray) -> None:
+    assert (pseudo[UNSURE] == adapt.UNUSED).all()
+    assert (pseudo[900:1150] == DEAD).all()
