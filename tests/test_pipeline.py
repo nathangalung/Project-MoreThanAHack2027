@@ -4,11 +4,12 @@ from dataclasses import replace
 
 import numpy as np
 import polars as pl
+import pytest
 
 from possession.decode import adapted_teams, decode, drop_short, viterbi, waiting
 from possession.degrade import carry_dead_ball, degrade, runs, smooth
 from possession.dfl import club_ids, squads
-from possession.features import FEATURE_NAMES, N_FEATURES, match_features
+from possession.features import FEATURE_NAMES, N_FEATURES, interpolate, match_features
 from possession.match import AWAY, DEAD, HOME, Match, mirrored
 from possession.skillcorner import hold, upsample
 from possession.train import tune_decoder
@@ -111,6 +112,31 @@ def test_degrade_is_repeatable() -> None:
     assert np.array_equal(first.ball, second.ball, equal_nan=True)
     assert first.label is not None and second.label is not None
     assert np.array_equal(first.label, second.label)
+
+
+def test_degrade_handles_exits_and_brief_stoppages() -> None:
+    match = toy_match()
+    ball = match.ball.copy()
+    # Ball leaves the pitch repeatedly
+    ball[np.arange(len(ball)) // 50 % 2 == 1] += 100.0
+    label = np.full(len(ball), HOME, dtype=np.int8)
+    label[500:505] = DEAD
+    label[1000:1400] = DEAD
+    noisy = degrade(replace(match, ball=ball, label=label), np.zeros(len(ball), dtype=np.float32), seed=1)
+    assert noisy.n_frames == match.n_frames
+    assert np.isnan(noisy.ball[:, 0]).any() and not np.isnan(noisy.ball[:, 0]).all()
+
+
+def test_degrade_needs_labels() -> None:
+    with pytest.raises(ValueError, match="no labels"):
+        degrade(replace(toy_match(100), label=None), np.zeros(100, dtype=np.float32), seed=0)
+
+
+def test_interpolate_fills_gaps_and_handles_no_data() -> None:
+    values = np.array([[0.0], [np.nan], [4.0]])
+    seen = ~np.isnan(values[:, 0])
+    assert interpolate(values, seen).tolist() == [[0.0], [2.0], [4.0]]
+    assert interpolate(values, np.zeros(3, dtype=bool)).tolist() == [[0.0], [0.0], [0.0]]
 
 
 def test_simulated_ball_has_no_brief_tracks() -> None:

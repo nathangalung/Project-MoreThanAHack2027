@@ -11,8 +11,6 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
-    "ipykernel>=7.4.0",
-    "jupyter>=1.1.1",
     "numpy>=2.5.4",
     "polars>=2.1.0",
     "torch>=2.15.0",
@@ -30,6 +28,8 @@ module-root = ""
 dev = [
     "pyright>=1.1.414",
     "pytest>=9.2.0",
+    "pytest-bdd>=9.0.1",
+    "pytest-cov>=7.1.0",
     "ruff>=0.17.4",
 ]
 evaluation = [
@@ -57,3 +57,11 @@ extraPaths = ["evaluation"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--cov --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["possession"]
+
+[tool.coverage.report]
+fail_under = 99
+exclude_also = ['if __name__ == "__main__":']
