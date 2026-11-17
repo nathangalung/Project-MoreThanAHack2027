@@ -13,24 +13,20 @@ from possession.decode import adapted_teams, decode, waiting
 from possession.match import LABELS
 from possession.metrics import macro_f1, spell_f1
 from possession.model import PossessionNet, predict_match
-from possession.paths import FPS, KICKOFFS, MODEL_DIR, PUBLIC_GT, RESULTS_DIR, TEAM
-from possession.train import NAME
+from possession.paths import ADAPTED, DECODER, FPS, KICKOFFS, MODEL_DIR, PUBLIC_GT, RESULTS_DIR, TEAM, TRAINED
 
 CODES = {"H": 0, "A": 1, "D": 2, "X": 3}
 # CPU repeats exactly, CUDA not
 DEVICE = "cpu"
-# Networks adapted to the match
-ADAPTED = f"{NAME}_adapted"
 
 
-def load_models(names: list[str], device: str) -> list[PossessionNet]:
-    """Every network in the files."""
+def load_models(path: Path, device: str) -> list[PossessionNet]:
+    """Every network in the file."""
     models = []
-    for name in names:
-        for state in torch.load(MODEL_DIR / f"{name}.pt", map_location=device):
-            model = PossessionNet().to(device)
-            model.load_state_dict(state)
-            models.append(model)
+    for state in torch.load(path, map_location=device):
+        model = PossessionNet().to(device)
+        model.load_state_dict(state)
+        models.append(model)
     return models
 
 
@@ -43,19 +39,18 @@ def public_scores(labels: np.ndarray) -> tuple[float, float]:
 
 
 def run(
-    models: tuple[str, ...] = (NAME,),
-    decoder: str = f"{NAME}_decoder",
+    folder: Path = MODEL_DIR,
     device: str = DEVICE,
     out: Path = RESULTS_DIR / f"{TEAM}.csv",
-    adapted: str = ADAPTED,
+    adapted: bool = True,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Write the file, return labels."""
     match = target_match()
-    prob = predict_match(load_models(list(models), device), match, device)
+    prob = predict_match(load_models(folder / TRAINED, device), match, device)
     if adapted:
         # Adapted networks only pick teams
-        prob = adapted_teams(prob, predict_match(load_models([adapted], device), match, device))
-    settings = json.loads((MODEL_DIR / f"{decoder}.json").read_text())
+        prob = adapted_teams(prob, predict_match(load_models(folder / ADAPTED, device), match, device))
+    settings = json.loads((folder / DECODER).read_text())
     # Dead ball before each kickoff
     labels = decode(prob, match.blocks, **settings, known_dead=waiting(match.n_frames, match.blocks, KICKOFFS, FPS))
 
@@ -71,13 +66,12 @@ def run(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--models", nargs="+", default=[NAME])
-    parser.add_argument("--decoder", default=f"{NAME}_decoder")
+    parser.add_argument("--folder", type=Path, default=MODEL_DIR, help="folder with weights and decoder setting")
     parser.add_argument("--device", choices=["cpu", "cuda"], default=DEVICE, help="cpu repeats exactly, cuda may not")
     parser.add_argument("--out", type=Path, default=RESULTS_DIR / f"{TEAM}.csv")
-    parser.add_argument("--adapted", default=ADAPTED, help="empty string skips the adapted networks")
+    parser.add_argument("--trained-only", action="store_true", help="skip the adapted networks")
     args = parser.parse_args()
-    run(tuple(args.models), args.decoder, args.device, args.out, args.adapted)
+    run(args.folder, args.device, args.out, not args.trained_only)
 
 
 if __name__ == "__main__":

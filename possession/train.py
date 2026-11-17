@@ -7,6 +7,7 @@ import multiprocessing
 import signal
 import time
 from concurrent.futures import Executor, ProcessPoolExecutor
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -19,7 +20,7 @@ from possession.features import match_features
 from possession.match import Match
 from possession.metrics import macro_f1, spell_f1
 from possession.model import PossessionNet, predict_match, predict_proba
-from possession.paths import CACHE_DIR, MODEL_DIR
+from possession.paths import CACHE_DIR, DECODER, MODEL_DIR, TRAINED
 from possession.skillcorner import REAL_MATCHES, load_real
 
 # Defaults of a full run
@@ -27,7 +28,6 @@ VALID_IDS = ("J03WMX", "J03WR9")
 EPOCHS = 24
 STEPS = 250
 SEEDS = (0, 1, 2, 3, 4)
-NAME = "model"
 
 VALID_COPIES = 3
 VALID_SEED = 999
@@ -174,7 +174,7 @@ def run(
     epochs: int = EPOCHS,
     steps: int = STEPS,
     seeds: tuple[int, ...] = SEEDS,
-    name: str = NAME,
+    folder: Path = MODEL_DIR,
 ) -> list[float]:
     """Train, tune decoder, and save."""
     unknown = [match_id for match_id in valid_ids if match_id not in MATCHES]
@@ -186,7 +186,7 @@ def run(
     print(f"training on {torch.cuda.get_device_name(0) if device == 'cuda' else 'CPU'}", flush=True)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    MODEL_DIR.mkdir(exist_ok=True)
+    folder.mkdir(parents=True, exist_ok=True)
 
     # Workers build fresh degradations
     with ProcessPoolExecutor(WORKERS, multiprocessing.get_context("spawn"), ignore_interrupt) as pool:
@@ -205,12 +205,12 @@ def run(
         ]
         print("predicting validation matches, about 5 minutes", flush=True)
         probs = [[predict_match(models, match, device) for match in matches] for matches in groups]
-        np.savez_compressed(CACHE_DIR / f"{name}_validation.npz", *probs[0], *probs[1])
+        np.savez_compressed(CACHE_DIR / "validation.npz", *probs[0], *probs[1])
         print("tuning decoder, about 6 minutes", flush=True)
         best, scores = tune_decoder(probs, groups)
         print(f"decoder {best} with {len(seeds)} networks averaged", flush=True)
         print(f"spellF1 open held-out {scores[0]:.4f}, real matches {scores[1]:.4f}", flush=True)
-        (MODEL_DIR / f"{name}_decoder.json").write_text(json.dumps(best))
+        (folder / DECODER).write_text(json.dumps(best))
         del groups, probs
 
         # Refit on every open match
@@ -218,8 +218,8 @@ def run(
         for seed in seeds:
             print(f"step 2 of 2, seed {seed}, fit on all matches", flush=True)
             models.append(fit(list(MATCHES), [], epochs, steps, seed, device, pool))
-    torch.save([model.state_dict() for model in models], MODEL_DIR / f"{name}.pt")
-    print(f"saved {MODEL_DIR / name}.pt")
+    torch.save([model.state_dict() for model in models], folder / TRAINED)
+    print(f"saved {folder / TRAINED}")
     return scores
 
 
@@ -229,9 +229,9 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=EPOCHS)
     parser.add_argument("--steps", type=int, default=STEPS, help="batches per epoch")
     parser.add_argument("--seeds", nargs="+", type=int, default=list(SEEDS), help="one network per seed")
-    parser.add_argument("--name", default=NAME)
+    parser.add_argument("--folder", type=Path, default=MODEL_DIR, help="where the weights are saved")
     args = parser.parse_args()
-    run(tuple(args.valid), args.epochs, args.steps, tuple(args.seeds), args.name)
+    run(tuple(args.valid), args.epochs, args.steps, tuple(args.seeds), args.folder)
 
 
 if __name__ == "__main__":

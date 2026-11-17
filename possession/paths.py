@@ -17,6 +17,8 @@ KICKOFFS = tuple(games.anchor_video_frame(games.GAMES[GAME][key]) for key in ("k
 
 CACHE_DIR = ROOT / "artifacts"
 MODEL_DIR = ROOT / "models"
+# Files inside a weights folder
+TRAINED, ADAPTED, DECODER = "trained.pt", "adapted.pt", "decoder.json"
 RESULTS_DIR = ROOT / "evaluation" / "results"
 TEAM = "BYTZ"
 PUBLIC_GT = ROOT / "evaluation" / "gt" / f"{GAME}_possession_gt_public.csv"

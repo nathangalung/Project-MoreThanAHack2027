@@ -3,6 +3,7 @@
 import argparse
 import copy
 import json
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -12,9 +13,9 @@ from possession.broadcast import target_match
 from possession.decode import decode, waiting
 from possession.match import Match
 from possession.model import SWAPPED, PossessionNet, predict_views, view_features
-from possession.paths import FPS, KICKOFFS, MODEL_DIR
+from possession.paths import ADAPTED, DECODER, FPS, KICKOFFS, MODEL_DIR, TRAINED
 from possession.predict import load_models
-from possession.train import BATCH, CROP, NAME
+from possession.train import BATCH, CROP
 
 # Chosen on other matches
 STEPS = 800
@@ -78,21 +79,21 @@ def adapt_all(models: list[PossessionNet], match: Match, settings: dict, device:
     return [adapt(model, views, labels, match.blocks, seed, device) for seed, model in enumerate(models)]
 
 
-def run(name: str = NAME) -> None:
+def run(folder: Path = MODEL_DIR) -> None:
     """Adapt and save the networks."""
     device = "cuda" if torch.cuda.is_available() else "cpu"
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    settings = json.loads((MODEL_DIR / f"{name}_decoder.json").read_text())
-    students = adapt_all(load_models([name], device), target_match(), settings, device)
-    torch.save([student.state_dict() for student in students], MODEL_DIR / f"{name}_adapted.pt")
-    print(f"saved {MODEL_DIR / name}_adapted.pt")
+    settings = json.loads((folder / DECODER).read_text())
+    students = adapt_all(load_models(folder / TRAINED, device), target_match(), settings, device)
+    torch.save([student.state_dict() for student in students], folder / ADAPTED)
+    print(f"saved {folder / ADAPTED}")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--name", default=NAME)
-    run(parser.parse_args().name)
+    parser.add_argument("--folder", type=Path, default=MODEL_DIR, help="folder with the trained weights")
+    run(parser.parse_args().folder)
 
 
 if __name__ == "__main__":

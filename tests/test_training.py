@@ -43,7 +43,6 @@ def toy_training(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(train, "MATCHES", {"a": "x", "b": "x"})
     monkeypatch.setattr(train, "REAL_MATCHES", ("r",))
     monkeypatch.setattr(train, "ProcessPoolExecutor", InlinePool)
-    monkeypatch.setattr(train, "MODEL_DIR", tmp_path / "models")
     monkeypatch.setattr(train, "CACHE_DIR", tmp_path)
     monkeypatch.setattr(train, "CROP", 64)
     monkeypatch.setattr(train, "VARIANTS", 1)
@@ -78,13 +77,13 @@ def test_group_score_is_one_for_true_paths() -> None:
 
 
 def test_run_trains_tunes_and_saves(toy_training: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    scores = train.run(valid_ids=("a",), epochs=1, steps=1, seeds=(0,), name="toy")
+    scores = train.run(valid_ids=("a",), epochs=1, steps=1, seeds=(0,), folder=toy_training / "models")
     assert len(scores) == 2 and all(0.0 <= score <= 1.0 for score in scores)
-    decoder = json.loads((toy_training / "models" / "toy_decoder.json").read_text())
+    decoder = json.loads((toy_training / "models" / "decoder.json").read_text())
     assert set(decoder) == {"penalty", "min_spell", "min_dead"}
-    states = torch.load(toy_training / "models" / "toy.pt", weights_only=True)
+    states = torch.load(toy_training / "models" / "trained.pt", weights_only=True)
     assert len(states) == 1
-    assert (toy_training / "toy_validation.npz").is_file()
+    assert (toy_training / "validation.npz").is_file()
     printed = capsys.readouterr().out
     assert "valid macroF1" in printed and "step 2 of 2" in printed
 
@@ -101,9 +100,9 @@ def test_run_rejects_bad_arguments(toy_training: Path) -> None:
 def test_command_line_passes_its_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
     seen = []
     monkeypatch.setattr(train, "run", lambda *args: seen.append(args))
-    monkeypatch.setattr(sys, "argv", ["train.py", "--epochs", "2", "--steps", "3", "--seeds", "7", "--name", "n"])
+    monkeypatch.setattr(sys, "argv", ["train.py", "--epochs", "2", "--steps", "3", "--seeds", "7", "--folder", "n"])
     train.main()
-    assert seen == [(train.VALID_IDS, 2, 3, (7,), "n")]
+    assert seen == [(train.VALID_IDS, 2, 3, (7,), Path("n"))]
 
 
 def test_workers_ignore_interrupts(monkeypatch: pytest.MonkeyPatch) -> None:

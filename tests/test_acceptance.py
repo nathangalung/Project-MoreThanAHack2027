@@ -16,6 +16,7 @@ from possession import adapt, predict
 from possession.decode import adapted_teams
 from possession.match import DEAD, Match
 from possession.model import PossessionNet, predict_match
+from possession.paths import ADAPTED, DECODER, TRAINED
 
 scenarios("features/submission.feature")
 
@@ -35,7 +36,6 @@ def match_with_halves(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Match:
     for module in (predict, adapt):
         monkeypatch.setattr(module, "target_match", lambda: match)
         monkeypatch.setattr(module, "KICKOFFS", KICKOFFS)
-        monkeypatch.setattr(module, "MODEL_DIR", tmp_path)
     monkeypatch.setattr(predict, "PUBLIC_GT", public)
     monkeypatch.setattr(adapt, "CROP", 64)
     monkeypatch.setattr(adapt, "STEPS", 1)
@@ -46,15 +46,15 @@ def match_with_halves(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Match:
 @given("trained and adapted networks", target_fixture="folder")
 def saved_networks(tmp_path: Path) -> Path:
     torch.manual_seed(0)
-    for name in ("model", "model_adapted"):
-        torch.save([PossessionNet().state_dict() for _ in range(2)], tmp_path / f"{name}.pt")
-    (tmp_path / "model_decoder.json").write_text(json.dumps({"penalty": 20.0, "min_spell": 0, "min_dead": 0}))
+    for name in (TRAINED, ADAPTED):
+        torch.save([PossessionNet().state_dict() for _ in range(2)], tmp_path / name)
+    (tmp_path / DECODER).write_text(json.dumps({"penalty": 20.0, "min_spell": 0, "min_dead": 0}))
     return tmp_path
 
 
 @when("the prediction runs", target_fixture="rows")
 def prediction_runs(folder: Path, capsys: pytest.CaptureFixture[str]) -> pl.DataFrame:
-    labels, prob = predict.run(out=folder / "out.csv")
+    labels, prob = predict.run(folder=folder, out=folder / "out.csv")
     assert labels.shape == (FRAMES,) and prob.shape == (FRAMES, 3)
     assert "public window spellF1" in capsys.readouterr().out
     return pl.read_csv(folder / "out.csv")
@@ -63,8 +63,8 @@ def prediction_runs(folder: Path, capsys: pytest.CaptureFixture[str]) -> pl.Data
 @when("the prediction runs without the adapted networks", target_fixture="rows")
 def prediction_runs_plain(folder: Path, monkeypatch: pytest.MonkeyPatch) -> pl.DataFrame:
     out = folder / "plain.csv"
-    (folder / "model_adapted.pt").unlink()
-    monkeypatch.setattr(sys, "argv", ["predict.py", "--adapted", "", "--out", str(out)])
+    (folder / ADAPTED).unlink()
+    monkeypatch.setattr(sys, "argv", ["predict.py", "--folder", str(folder), "--trained-only", "--out", str(out)])
     predict.main()
     return pl.read_csv(out)
 
@@ -128,31 +128,30 @@ def live_follows_adapted(combined: np.ndarray) -> None:
 
 @when("the networks adapt to the match", target_fixture="pseudo")
 def networks_adapt(match: Match, folder: Path, monkeypatch: pytest.MonkeyPatch) -> np.ndarray:
-    models = predict.load_models(["model"], "cpu")
-    settings = json.loads((folder / "model_decoder.json").read_text())
+    models = predict.load_models(folder / TRAINED, "cpu")
+    settings = json.loads((folder / DECODER).read_text())
     confident = np.zeros((FRAMES, 3), dtype=np.float32)
     confident[:, DEAD] = 1.0
     confident[UNSURE] = [0.2, 0.2, 0.6]
     monkeypatch.setattr(adapt, "predict_views", lambda *args: confident)
     pseudo = adapt.pseudo_labels(models, match, [], settings, "cpu")
     monkeypatch.undo()
-    monkeypatch.setattr(sys, "argv", ["adapt.py", "--name", "model"])
+    monkeypatch.setattr(sys, "argv", ["adapt.py", "--folder", str(folder)])
     for module in (predict, adapt):
         monkeypatch.setattr(module, "target_match", lambda: match)
         monkeypatch.setattr(module, "KICKOFFS", KICKOFFS)
-        monkeypatch.setattr(module, "MODEL_DIR", folder)
     monkeypatch.setattr(adapt, "CROP", 64)
     monkeypatch.setattr(adapt, "STEPS", 1)
     monkeypatch.setattr(adapt, "CONFIDENCE", 0.0)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    (folder / "model_adapted.pt").unlink()
+    (folder / ADAPTED).unlink()
     adapt.main()
     return pseudo
 
 
 @then("adapted weights are saved for every network")
 def adapted_weights_saved(folder: Path, match: Match) -> None:
-    students = predict.load_models(["model_adapted"], "cpu")
+    students = predict.load_models(folder / ADAPTED, "cpu")
     assert len(students) == 2
     assert predict_match(students, match, "cpu").shape == (FRAMES, 3)
 
@@ -166,7 +165,7 @@ def kickoff_frames_left_out(pseudo: np.ndarray) -> None:
 
 @then("no adapted weights were needed")
 def no_adapted_weights(folder: Path) -> None:
-    assert not (folder / "model_adapted.pt").exists()
+    assert not (folder / ADAPTED).exists()
 
 
 @then("frames under the confidence threshold are left out")
