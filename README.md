@@ -32,7 +32,7 @@ No ground truth label from the target match is used for training or tuning. A la
 | spellF1 | Public window of the target match | 0.6533 |
 | macroF1 | Public window of the target match | 0.9263 |
 
-The public window has 17 possessions and a noise band of about 0.33 on spellF1, so it is a check and not a measure. `BYTZ.md` has the full account.
+The first two rows are measured without the adaptation step. With two networks, the adapted team decision added 0.0085 on the real matches and 0.0031 on the open ones. The public window has 17 possessions and a noise band of about 0.33 on spellF1, so it is a check and not a measure. `BYTZ.md` has the full account.
 
 ## Why This Design
 

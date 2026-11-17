@@ -23,13 +23,14 @@ The scores on the open matches are optimistic. The decoder setting was chosen on
 
 Late in the work we found that two of the seven open matches carry three referee tracks each, and that our loader had counted them as away players. One of the two is a held-out match. We left the referees out and trained again. With the same decoder setting, the score on the real matches rose from 0.6637 to 0.6712. The table above, the decoder table, and the ensemble sizes are measured with the final networks. The tests of single design choices further down were run before this correction, so their absolute scores are a little lower. Each of them compares two variants under the same conditions.
 
-The public window has only 17 possessions. The official bootstrap gives a noise band of about 0.33 on its spellF1, so it cannot separate two models. We printed it after each run as a check that the pipeline is correct. The model, the decoder, and the number of networks were chosen on the other two validation sets. The public window still touched the work in four places, and we list them so a reader can judge.
+The public window has only 17 possessions. The official bootstrap gives a noise band of about 0.33 on its spellF1, so it cannot separate two models. We printed it after each run as a check that the pipeline is correct. The model, the decoder, and the number of networks were chosen on the other two validation sets. The public window still touched the work in five places, and we list them so a reader can judge.
 
 | Where | What the Public Window Did | What the Decision Rests On |
 |---|---|---|
 | Frozen ball in the simulation | A dead ball recall of 32% in the window showed that something was wrong | The open data freezes the ball at a speed of exactly zero, and the provided tracking does not. That is a fact about the inputs |
 | Broadcast cutaways as an input | We first saw there that cutaways line up with stoppages | A controlled test on held-out open matches |
 | Whistle detection from audio | It gave 3 hits, 3 false alarms, and 2 misses in the window, and we dropped it | Only the window. The open matches have no audio, so no other check was possible |
+| Training on real matches as well | We counted the brief possessions in the window (three of 17 last under three seconds between two possessions of the other team). No model was scored | The count showed that the challenge keeps brief possessions, which the mixed training removes. It closed an idea and changed nothing in the submitted model |
 | Adaptation step | A lower score in the window made us look closer | The split of the gain by frame type and by part of the decision on the real matches, and the test on held-out open matches |
 
 The gains we report for single design choices lie between 0.005 and 0.02 spellF1. They are measured over 20 matches, where they are clear. On the one scored match the organisers give a noise band of about 0.04, so no single one of them would be visible there.
@@ -161,11 +162,11 @@ That result pointed at the stoppage decision, so we split the step in two and sc
 
 | Part Taken From the Adapted Networks | 20 Real Matches | Six Degraded Open Copies |
 |---|---|---|
-| Both (the full step) | +0.0134, standard error 0.0027, better in 17 | +0.0010, better in 4 |
+| Both (the full step) | +0.0134, standard error 0.0027, better in 17 | +0.0011, better in 4 |
 | Team split only | +0.0085, standard error 0.0024, better in 15 | +0.0031, better in 5 |
 | Dead ball probability only | +0.0058, standard error 0.0014, better in 17 | −0.0038, worse in all 6 |
 
-The team split passes the rule. The dead ball part gains on the real matches, where replays carry no players, and loses on every open copy, which is the data built to resemble the provided match. So the submitted file takes the dead ball probability from the networks trained on open data and the team split from the adapted networks. Stoppages cannot drift this way, because the adapted networks have no say in them.
+The team split passes the rule. The dead ball part gains on the real matches, where replays carry no players, and loses on every open copy, which is the data built to resemble the provided match. So the submitted file takes the dead ball probability from the networks trained on open data and the team split from the adapted networks. Stoppages cannot drift this way, because the adapted networks have no say in them. We checked the team part on the provided match in the same way as the dead ball part before. Against the file without adaptation, 1.2% of the graded frames change team and the number of possessions falls by 5.7%. On the 20 real matches the same step changes team on 1.3% of the frames on average, and the number of possessions moves between −6.1% and +4.7%. The provided match lies inside that range.
 
 The public window was not part of this choice, but it is why we looked closer. When we printed it as the usual check, the adapted networks scored 0.600 spellF1 against 0.667 before adaptation, with macroF1 unchanged. Two possessions next to stoppages explain the difference, which is within what 17 possessions produce by chance. Looking into those frames showed the mechanism: adaptation makes the networks call a stoppage sooner when they cannot see the ball. That led us to split the gain on the real matches by frame type, which gave the first reason above.
 
@@ -189,7 +190,7 @@ The submitted file, with the team split from the adapted networks, agrees with t
 | Tactical homography | No | The camera centre follows the ball (correlation 0.83) but is 12 metres off on median, which the player centroid already gives |
 | Tactical audio | No | Whistle detection gave 3 hits, 3 false alarms, and 2 misses in the public window. That is the only check we could make, because the open matches have no audio |
 | Video frames | No | We measured what ball detection could give at best before building it. On held-out open matches, revealing every hidden ball during live play raises spellF1 by 0.020, half of them by 0.010, and with false detections in 30% of gaps the gain is gone. In the provided match both cameras miss the ball on 36% of graded frames, but only 2.5% of graded frames are predicted live with the ball hidden (measured with an earlier three-network model). The gaps lie in stoppages, where a found ball does not change the label |
-| Public ground truth | Check only | Printed after the file is written. Never used for training or to tune a setting. The summary lists the four places where it still touched the work |
+| Public ground truth | Check only | Printed after the file is written. Never used for training or to tune a setting. The summary lists the five places where it still touched the work |
 
 In a controlled test on held-out open matches, single networks without the broadcast inputs scored 0.6357 and 0.6291 for two random seeds, against 0.6636 and 0.6497 with them, so we kept them. The test ran before the last simulation change. The gain is measured on simulated cutaways and a simulated second camera, so it shows that the model can use these inputs, not how large the gain is on the provided match.
 
