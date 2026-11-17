@@ -1,10 +1,10 @@
-# BYTZ Technical Document
+# BYTZ Detailed Record
 
-More than a Hack 2027, Phase 1: Ball Possession.
+More than a Hack 2027, Phase 1: Ball Possession. This file is the full record behind the short technical document `BYTZ.md`. It holds every test we ran, including the ideas we did not adopt, and every place where the public window touched the work. The numbers in `BYTZ.md` are taken from here.
 
 | Team Name | Members |
 |---|---|
-| BYTZ | Bryan Philinathaniel Hutagalung, Shazya Audrea Taufik, Yovanka Sandrina Maharaja, Tamara Mayranda Lubis |
+| BYTZ | 1. Bryan Philinathaniel Hutagalung (Lead)<br>2. Shazya Audrea Taufik<br>3. Tamara Mayranda Lubis<br>4. Yovanka Sandrina Maharaja |
 
 ## Summary
 
@@ -13,7 +13,7 @@ We label each frame as home possession, away possession, or dead ball with an av
 | Measure | Where It Is Measured | Value |
 |---|---|---|
 | spellF1 of Our Model | 20 real matches with automatic tracking (SkillCorner), never trained on | 0.6712 |
-| spellF1 of Our Model | Two held-out open matches (DFL), degraded | 0.6497 |
+| spellF1 of Our Model | Two held-out open matches of the Deutsche Fussball Liga (DFL), degraded | 0.6497 |
 | spellF1 of the Submitted File | Public window of the provided match | 0.6533 |
 | macroF1 of the Submitted File | Public window of the provided match | 0.9263 |
 | spellF1 of `baseline_smooth50` | Public window of the provided match | 0.3256 |
@@ -40,9 +40,7 @@ The gains we report for single design choices lie between 0.004 and 0.03 spellF1
 
 ### Why Supervised Learning on Other Matches
 
-The rules forbid labels from the provided match, and the public five minutes hold 17 possessions, too few to tune on. Hand-written rules such as "the team nearest to the ball has it" fail in this data for a concrete reason: the tactical tracker sees the ball on only 59% of graded frames, and the gaps have a median of about 10 seconds. A rule has nothing to work with during a gap. A sequence model can still read the players, since both teams move as a unit around the ball, and it can carry the last known state across the gap.
-
-The open DFL dataset gives about one million labelled frames at the same frame rate of 25 per second. That is enough to train a network of about 0.9 million parameters, as long as the inputs look the same in both worlds.
+The rules forbid labels from the provided match, and the public five minutes hold 17 possessions, too few to tune on. Hand-written rules such as "the team nearest to the ball has it" fail in this data for a concrete reason: the tactical tracker sees the ball on only 59% of graded frames, and the gaps have a median of about 10 seconds. A rule has nothing to work with during a gap. A sequence model can still read the players, since both teams move as a unit around the ball, and it can carry the last known state across the gap. The open DFL dataset gives about one million labelled frames at the same frame rate of 25 per second. That is enough to train a network of about 0.9 million parameters, as long as the inputs look the same in both worlds.
 
 ### Making the Open Data Look Like the Provided Data
 
@@ -62,11 +60,7 @@ The open tracking comes from the calibrated multi-camera system of the league. T
 | Positions are off centre by a constant shift | Random shift of all positions by up to 2.5 metres |
 | Either team can attack either way | Random flips of both axes and random swap of home and away |
 
-Two findings changed the result more than any model change.
-
-**The frozen ball.** A first model trained on the frozen ball reached 0.66 on held-out open matches but found only 32% of the dead ball frames in the public window, because it had learned that a still ball means a stoppage. The submitted model finds 90% of them. The held-out score barely moved after the change, which shows that a held-out score on simulated data cannot detect a flaw in the simulation itself.
-
-**Flicker and jerk.** We then compared all 50 features between the degraded open data and the provided match, including run lengths and frame-to-frame changes. The means agreed, but the timing did not.
+Two findings changed the result more than any model change. **The frozen ball.** A first model trained on the frozen ball reached 0.66 on held-out open matches but found only 32% of the dead ball frames in the public window, because it had learned that a still ball means a stoppage. The submitted model finds 90% of them. The held-out score barely moved after the change, which shows that a held-out score on simulated data cannot detect a flaw in the simulation itself. **Flicker and jerk.** We then compared all 50 features between the degraded open data and the provided match, including run lengths and frame-to-frame changes. The means agreed, but the timing did not.
 
 | Statistic of the Tactical Ball Track | Provided Match | Simulation Before | Simulation After |
 |---|---|---|---|
@@ -75,9 +69,7 @@ Two findings changed the result more than any model change.
 | Share of visible runs under 4 frames | 0% | 2% to 13% | 0% |
 | 99th percentile of ball acceleration in m/s² | 32 | 62 to 288 | 31 to 92 |
 
-The ranges cover 21 random copies of the open matches.
-
-On the 20 real matches, the average of two networks rose from 0.591 to 0.610 spellF1 after this change, and both single networks improved.
+The ranges cover 21 random copies of the open matches. On the 20 real matches, the average of two networks rose from 0.591 to 0.610 spellF1 after this change, and both single networks improved.
 
 ### Features
 
@@ -92,9 +84,7 @@ Each frame gets 50 numbers. None of them needs a player identity.
 
 ### Model
 
-Two one-dimensional convolutions feed a two-layer bidirectional GRU with 160 hidden units per direction, followed by a linear layer with three outputs. The network has about 0.9 million parameters. It is trained with cross entropy, label smoothing of 0.02, AdamW, and a one-cycle learning rate that peaks at 0.002, on random crops of 2,048 frames (82 seconds).
-
-A recurrent network fits the task because possession is a state that persists: the label at a frame depends on what happened seconds before and after.
+Two one-dimensional convolutions feed a two-layer bidirectional gated recurrent unit (GRU) with 160 hidden units per direction, followed by a linear layer with three outputs. The network has about 0.9 million parameters. It is trained with cross entropy, label smoothing of 0.02, AdamW, and a one-cycle learning rate that peaks at 0.002, on random crops of 2,048 frames (82 seconds). A recurrent network fits the task because possession is a state that persists: the label at a frame depends on what happened seconds before and after.
 
 | Choice | Evidence |
 |---|---|
@@ -106,9 +96,7 @@ Every training frame of all seven matches is used. Random crops only decide whic
 
 ### Decoder
 
-Frame probabilities flicker, and each flicker creates a false possession. A Viterbi pass finds the best label path under a constant cost for every switch, and runs shorter than a minimum length are absorbed by their left neighbour.
-
-The two validation sets want different settings, because they label possession differently. The DFL labels switch on brief touches, and a possession lasts 5.5 to 9.2 seconds on average, depending on the match. The SkillCorner labels switch only when a team gains a possession phase, and a possession lasts 10.0 to 18.2 seconds. The challenge definition asks for controlled possession and says that a touch, a deflection, or a won aerial duel is not a change, which is closer to the second style. We do not know exactly where the provided ground truth sits between the two.
+Frame probabilities flicker, and each flicker creates a false possession. A Viterbi pass finds the best label path under a constant cost for every switch, and runs shorter than a minimum length are absorbed by their left neighbour. The two validation sets want different settings, because they label possession differently. The DFL labels switch on brief touches, and a possession lasts 5.5 to 9.2 seconds on average, depending on the match. The SkillCorner labels switch only when a team gains a possession phase, and a possession lasts 10.0 to 18.2 seconds. The challenge definition asks for controlled possession and says that a touch, a deflection, or a won aerial duel is not a change, which is closer to the second style. We do not know exactly where the provided ground truth sits between the two.
 
 | Switch Cost | spellF1 on Held-Out DFL | spellF1 on Real SkillCorner |
 |---|---|---|
@@ -139,9 +127,7 @@ We could test this step on other matches, because each real SkillCorner match ca
 | Eight real matches, three networks trained on all seven open matches | 0.6597 | 0.6742 | +0.0145, standard error 0.0046 |
 | Six degraded copies of the held-out open matches | 0.6398 | 0.6416 | +0.0018, standard error 0.0048 |
 
-The step helps on the real matches, by about four standard errors, and changes nothing on the open ones. It is also more than extra smoothing: with the decoder rule applied to each side separately, the adapted networks score 0.007 higher on both validation sets. These tests ran with two and three networks.
-
-We also tried three changes to the adaptation itself, on ten of the real matches, with the other ten kept aside to confirm a winner.
+The step helps on the real matches, by about four standard errors, and changes nothing on the open ones. It is also more than extra smoothing: with the decoder rule applied to each side separately, the adapted networks score 0.007 higher on both validation sets. These tests ran with two and three networks. We also tried three changes to the adaptation itself, on ten of the real matches, with the other ten kept aside to confirm a winner.
 
 | Change | Result |
 |---|---|
@@ -149,17 +135,13 @@ We also tried three changes to the adaptation itself, on ten of the real matches
 | Mixing batches of degraded open data into the adaptation | 0.0057 worse than plain adaptation. It pulls the networks back toward the simulation |
 | Learning the probabilities of the networks, not their decoded labels | No gain over the networks before adaptation. The confident decoded labels are what helps |
 
-Later we also doubled the number of steps to 1,600, on all 20 real matches with two networks. The gain of the team split was 0.0075, against 0.0085 with 800 steps, so the 800 steps stay.
-
-At first we did not adopt the step, for three reasons.
+Later we also doubled the number of steps to 1,600, on all 20 real matches with two networks. The gain of the team split was 0.0075, against 0.0085 with 800 steps, so the 800 steps stay. At first we did not adopt the step, for three reasons.
 
 1. Half of the gain does not carry over. On about 70% of the frames where the broadcast shows a replay, the SkillCorner data has no players at all, and on the rest it only carries extrapolated positions that the tracker did not see. Half of the gain in spellF1 comes from the frames without players (0.007 of 0.0145). The provided tactical tracking keeps its players during replays, so that half has nothing to work on.
 2. On the data built to resemble the provided match, the degraded open matches, the step changes nothing.
 3. The step has a cost. It adds a stage that cannot be checked on the provided match, and it would put weights trained on the provided tracking into a public repository.
 
-From the first two points we expect a gain of about 0.005 on the provided match, which is about as large as its own uncertainty. We judged that gain not worth the cost, and preferred the model that uses open data only.
-
-Before the deadline we repeated the test with the current networks, to decide once more. Two networks gained 0.0134 on the 20 real matches (standard error 0.0027, better in 17) and 0.0011 on the six degraded open copies. With the replay frames left unchanged, the gain on the real matches was 0.0053 (standard error 0.0023). We then adapted the five submitted networks to the provided match and compared the labels with the submitted file, without any ground truth. The two agree on 96.4% of the graded frames. But 2.3% of the frames move from live play to dead ball and only 0.3% the other way, so the dead ball share rises by 0.020. On the real matches the same step raised it by 0.003. A shift six times larger, in one direction, is what self-training drift looks like, and we had set that as a reason to stop before we looked. The fully adapted file was not submitted.
+From the first two points we expect a gain of about 0.005 on the provided match, which is about as large as its own uncertainty. We judged that gain not worth the cost, and preferred the model that uses open data only. Before the deadline we repeated the test with the current networks, to decide once more. Two networks gained 0.0134 on the 20 real matches (standard error 0.0027, better in 17) and 0.0011 on the six degraded open copies. With the replay frames left unchanged, the gain on the real matches was 0.0053 (standard error 0.0023). We then adapted the five submitted networks to the provided match and compared the labels with the submitted file, without any ground truth. The two agree on 96.4% of the graded frames. But 2.3% of the frames move from live play to dead ball and only 0.3% the other way, so the dead ball share rises by 0.020. On the real matches the same step raised it by 0.003. A shift six times larger, in one direction, is what self-training drift looks like, and we had set that as a reason to stop before we looked. The fully adapted file was not submitted.
 
 That result pointed at the stoppage decision, so we split the step in two and scored each half on the same matches. A frame probability has two parts: the probability of a dead ball, and the split of the rest between the two teams. We took one part from the adapted networks and the other from the networks before adaptation. The rule for adopting a half was set before the run: at least 0.004 on the real matches, at more than two standard errors, and no more than 0.003 lost on the open copies.
 
@@ -169,7 +151,7 @@ That result pointed at the stoppage decision, so we split the step in two and sc
 | Team split only | +0.0085, standard error 0.0024, better in 15 | +0.0031, better in 5 |
 | Dead ball probability only | +0.0058, standard error 0.0014, better in 17 | −0.0038, worse in all 6 |
 
-The team split passes the rule. The dead ball part gains on the real matches, where replays carry no players, and loses on every open copy, which is the data built to resemble the provided match. So the submitted file takes the dead ball probability from the networks trained on open data and the team split from the adapted networks. The adapted networks have no say in the dead ball probability. A stoppage boundary can still move when the decoder sees a different team split next to it: on the provided match 0.3% of the graded frames move from live play to dead ball and 0.3% the other way, so the dead ball share stays the same. The third reason above, weights trained on the provided tracking in a public repository, weighed less once the gain was shown on both validation sets. The weights are network parameters and hold no tracking data, and committing them lets the file be reproduced on CPU. We checked the team part on the provided match in the same way as the dead ball part before. Against the file without adaptation, 1.2% of the graded frames change team and the number of possessions falls by 5.7%. On the 20 real matches the same step changes team on 1.3% of the frames on average, and the number of possessions moves between −6.1% and +4.7%. The provided match lies inside that range.
+The team split passes the rule. The dead ball part gains on the real matches, where replays carry no players, and loses on every open copy, which is the data built to resemble the provided match. So the submitted file takes the dead ball probability from the networks trained on open data and the team split from the adapted networks. The adapted networks have no say in the dead ball probability. A stoppage boundary can still move when the decoder sees a different team split next to it: on the provided match 0.3% of the graded frames move from live play to dead ball and 0.3% the other way, so the dead ball share stays the same. The third reason above, weights trained on the provided tracking in a public repository, weighed less once the gain was shown on both validation sets. The weights are network parameters and hold no tracking data, and committing them lets the file be reproduced on the central processing unit (CPU). We checked the team part on the provided match in the same way as the dead ball part before. Against the file without adaptation, 1.2% of the graded frames change team and the number of possessions falls by 5.7%. On the 20 real matches the same step changes team on 1.3% of the frames on average, and the number of possessions moves between −6.1% and +4.7%. The provided match lies inside that range.
 
 The public window was not part of this choice, but it is why we looked closer. When we printed it as the usual check, the adapted networks scored 0.600 spellF1 against 0.667 before adaptation, with macroF1 unchanged. Two possessions next to stoppages explain the difference, which is within what 17 possessions produce by chance. Looking into those frames showed the mechanism: adaptation makes the networks call a stoppage sooner when they cannot see the ball. That led us to split the gain on the real matches by frame type, which gave the first reason above.
 
@@ -219,16 +201,14 @@ In a controlled test on held-out open matches, single networks without the broad
 
 | Dataset | Role | Source | Who Labelled | Amount |
 |---|---|---|---|---|
-| DFL open dataset (Bassek et al. 2025, Scientific Data 12, 195), CC-BY 4.0 | Training, and two matches held out for validation | https://doi.org/10.6084/m9.figshare.28196177, mirrored at https://huggingface.co/datasets/pysport/idsse-data | The league data provider, as part of the official match data. Each frame carries `BallPossession` (home or away) and `BallStatus` (alive or dead) | 7 matches, 1,002,644 frames at 25 frames per second |
-| SkillCorner open data, MIT licence, credit to SkillCorner | Validation and decoder setting only, never training | https://github.com/SkillCorner/opendata, pinned to commit `4340d27` | SkillCorner, automatically. The tracking comes from computer vision on broadcast video. A frame is live when it lies in a phase of play, and the team is the team in possession of that phase | 20 matches of the Australian A-League 2024/25, about 3.0 million frames after resampling from 10 to 25 frames per second |
+| DFL open dataset (Bassek et al. 2025, Scientific Data 12, 195), Creative Commons Attribution (CC-BY) 4.0 | Training, and two matches held out for validation | https://doi.org/10.6084/m9.figshare.28196177, mirrored at https://huggingface.co/datasets/pysport/idsse-data | The league data provider, as part of the official match data. Each frame carries `BallPossession` (home or away) and `BallStatus` (alive or dead) | 7 matches, 1,002,644 frames at 25 frames per second |
+| SkillCorner open data, Massachusetts Institute of Technology (MIT) licence, credit to SkillCorner | Validation and decoder setting only, never training | https://github.com/SkillCorner/opendata, pinned to commit `4340d27` | SkillCorner, automatically. The tracking comes from computer vision on broadcast video. A frame is live when it lies in a phase of play, and the team is the team in possession of that phase | 20 matches of the Australian A-League 2024/25, about 3.0 million frames after resampling from 10 to 25 frames per second |
 
-The SkillCorner README mentions 10 matches. Its `matches.json` lists 20, and all 20 have data.
-
-No ground truth label comes from the provided match, and we labelled nothing by hand. The adaptation step trains on labels that the networks themselves predict for the provided match, which the rules allow.
+The SkillCorner README mentions 10 matches. Its `matches.json` lists 20, and all 20 have data. No ground truth label comes from the provided match, and we labelled nothing by hand. The adaptation step trains on labels that the networks themselves predict for the provided match, which the rules allow.
 
 ## Possession Rules
 
-We did not write possession rules. The model learns the definition that the DFL data uses, and the decoder then removes changes that do not last. We state the learned definition here so a reader knows where the lines fall. We checked it on the labels: in one open match, the ball is more than 3 metres from every player on 26% of live frames, yet none of the 408 changes of possession happens there. 98.5% of them happen with the ball within 1.5 metres of a player.
+Apart from the two rules outside the model, we did not write possession rules. The model learns the definition that the DFL data uses, and the decoder then removes changes that do not last. We state the learned definition here so a reader knows where the lines fall. We checked it on the labels: in one open match, the ball is more than 3 metres from every player on 26% of live frames, yet none of the 408 changes of possession happens there. 98.5% of them happen with the ball within 1.5 metres of a player.
 
 | Situation | Label |
 |---|---|
@@ -262,10 +242,6 @@ uv run possession/predict.py
 uv run evaluation/validate_submission.py evaluation/results/BYTZ.csv
 ```
 
-`predict.py` runs on CPU, takes about 20 minutes, and writes `evaluation/results/BYTZ.csv`. On our machine, the same weights gave a byte-identical file on every run, including a run from a fresh clone of the repository with a new environment. Prediction on CUDA gave a different file, so CPU is the default.
+`predict.py` runs on CPU, takes about 20 minutes, and writes `evaluation/results/BYTZ.csv`. On our machine, the same weights gave a byte-identical file on every run, including a run from a fresh clone of the repository with a new environment. Prediction on the graphics processing unit (GPU) through CUDA (Compute Unified Device Architecture) gave a different file, so CPU is the default. To rebuild the weights, run `uv run possession/train.py` (about 4 to 5 hours on an RTX 4060), or open `notebook.ipynb`, set `TRAIN = True`, and run all cells. An earlier version of the training gave byte-identical weights when we ran it twice on our machine. We did not repeat that test for the final version, and a different GPU or driver may give other weights, which is why the weights are committed.
 
-To rebuild the weights, run `uv run possession/train.py` (about 4 to 5 hours on an RTX 4060), or open `pipeline.ipynb`, set `TRAIN = True`, and run all cells. An earlier version of the training gave byte-identical weights when we ran it twice on our machine. We did not repeat that test for the final version, and a different GPU or driver may give other weights, which is why the weights are committed.
-
-The adapted weights in `models/model_adapted.pt` are rebuilt with `uv run possession/adapt.py` (about 10 minutes on the GPU). That step runs on CUDA and may not repeat exactly, which is why these weights are committed too. A file without the adaptation is written by `uv run possession/predict.py --adapted "" --out evaluation/results/plain.csv`.
-
-The open matches are downloaded on first use: about 2.5 GB for DFL and 1.8 GB for SkillCorner. The provided match data must be placed in `data/` as `docs/DATA.md` describes, and it is not part of the repository.
+The adapted weights in `models/adapted.pt` are rebuilt with `uv run possession/adapt.py` (about 10 minutes on the GPU). That step runs on CUDA and may not repeat exactly, which is why these weights are committed too. A file without the adaptation is written by `uv run possession/predict.py --trained-only --out evaluation/results/plain.csv`. The open matches are downloaded on first use: about 2.5 gigabytes (GB) for DFL and 1.8 GB for SkillCorner. The provided match data must be placed in `data/` as `docs/DATA.md` describes, and it is not part of the repository.

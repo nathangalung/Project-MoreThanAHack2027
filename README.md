@@ -8,7 +8,7 @@ The organiser documents are kept unchanged in `docs/`, and the scorer, the valid
 
 | Team Name | Members |
 |---|---|
-| BYTZ | Bryan Philinathaniel Hutagalung, Shazya Audrea Taufik, Yovanka Sandrina Maharaja, Tamara Mayranda Lubis |
+| BYTZ | 1. Bryan Philinathaniel Hutagalung (Lead)<br>2. Shazya Audrea Taufik<br>3. Tamara Mayranda Lubis<br>4. Yovanka Sandrina Maharaja |
 
 ## Approach
 
@@ -21,7 +21,7 @@ The organiser documents are kept unchanged in `docs/`, and the scorer, the valid
 7. Choose the decoder setting on matches that are never trained on: two held-out open matches, and 20 open matches with real automatic tracking (SkillCorner open data, MIT licence).
 8. Label every graded frame up to and including the kickoff frame of a half as dead ball. The kickoff frames are the anchors the organisers publish in `games.py`.
 
-No ground truth label from the target match is used for training or tuning. A last step adapts the networks to the target match with their own confident predictions, and the adapted networks only split the live probability between the two teams. The public 5 minutes are printed as a check after the file is written. `BYTZ.md` lists the six places where they still touched the work.
+No ground truth label from the target match is used for training or tuning. A last step adapts the networks to the target match with their own confident predictions, and the adapted networks only split the live probability between the two teams. The public 5 minutes are printed as a check after the file is written. `DETAILS.md` lists the six places where they still touched the work.
 
 ## Results
 
@@ -32,7 +32,7 @@ No ground truth label from the target match is used for training or tuning. A la
 | spellF1 | Public window of the target match | 0.6533 |
 | macroF1 | Public window of the target match | 0.9263 |
 
-The first two rows are measured without the adaptation step. With two networks, the adapted team decision added 0.0085 on the real matches and 0.0031 on the open ones. The public window has 17 possessions and a noise band of about 0.33 on spellF1, so it is a check and not a measure. `BYTZ.md` has the full account.
+The first two rows are measured without the adaptation step. With two networks, the adapted team decision added 0.0085 on the real matches and 0.0031 on the open ones. The public window has 17 possessions and a noise band of about 0.33 on spellF1, so it is a check and not a measure. `DETAILS.md` has the full account.
 
 ## Why This Design
 
@@ -63,15 +63,16 @@ The first two rows are measured without the adaptation step. With two networks, 
 | Tactical homography | The camera centre follows the ball along the pitch (correlation 0.83) but is 12 metres off on median, about what the player centroid already gives | Tried, not used |
 | Tactical audio | Whistle tones are detectable, but in the public window they gave 3 hits, 3 false alarms, and 2 missed stoppages. The open matches have no audio, so this is the only check we could make, and the networks could not have learned an audio input from them either | Tried, not used |
 | Video frames | On held-out open matches, revealing every hidden ball during live play gains 0.020 spellF1. In the target match only 2.5% of graded frames are predicted live with the ball hidden | Measured, not built |
-| Target tracking without labels | Networks that adapt to a real match with their own confident labels gain 0.014 spellF1 on real matches. Half of that comes from frames with no players, which the target tracking does not have, and on data built like the target the step changes nothing. The gain that carries over is in the team decision: with the stoppage decision left to the original networks, the gain is 0.009 on real matches and 0.003 on data built like the target | Adopted for the team decision only. `BYTZ.md` has the numbers |
+| Target tracking without labels | Networks that adapt to a real match with their own confident labels gain 0.014 spellF1 on real matches. Half of that comes from frames with no players, which the target tracking does not have, and on data built like the target the step changes nothing. The gain that carries over is in the team decision: with the stoppage decision left to the original networks, the gain is 0.009 on real matches and 0.003 on data built like the target | Adopted for the team decision only. `DETAILS.md` has the numbers |
 
 ## Folder Layout
 
 | Path | Whose | Content |
 |---|---|---|
 | `possession/` | Ours | The pipeline package: loading, features, model, training, prediction |
-| `BYTZ.md` | Ours | The technical document |
-| `pipeline.ipynb` | Ours | Runs the pipeline step by step and shows tables and charts |
+| `BYTZ.md` | Ours | The short technical document that is submitted |
+| `DETAILS.md` | Ours | The full record: every test, the ideas not adopted, and each use of the public window |
+| `notebook.ipynb` | Ours | Runs the pipeline step by step and shows tables and charts |
 | `tests/` | Ours | Unit tests for every module and acceptance scenarios for the submission file |
 | `models/` | Ours | Trained weights, adapted weights, and the decoder setting, committed after training |
 | `.github/workflows/checks.yml` | Ours | Runs lint, format check, type check, and the tests on pushes to `main` and the feature branch, and on pull requests |
@@ -90,7 +91,7 @@ Install uv, put the match data in `data/` as `docs/DATA.md` describes, then use 
 
 ```bash
 uv sync
-uv run jupyter lab pipeline.ipynb
+uv run jupyter lab notebook.ipynb
 ```
 
 Run the cells from top to bottom. Clear the outputs before committing, because the match data may not be published.
@@ -114,17 +115,17 @@ uv run evaluation/run_evaluation.py
 |---|---|---|
 | `uv sync` | Installs the pinned dependencies from `uv.lock` | A few minutes |
 | `uv run pytest` | Runs 44 tests on synthetic data and on the public window and baseline files of the organisers, with no download and no gated match data, and fails if line coverage of `possession/` drops under 99% (it is 100%) | About 30 seconds |
-| `train.py` | Downloads the open matches on first use (about 4.3 GB), fits five networks on five matches, tunes the decoder on the two held-out matches and the 20 real matches, then refits the networks on all seven and saves `models/model.pt` and `models/model_decoder.json` | About 4 to 5 hours |
-| `adapt.py` | Trains each network 800 more steps on the confident labels of the averaged networks for the provided match and saves `models/model_adapted.pt` | About 10 minutes |
-| `predict.py` | Writes `evaluation/results/BYTZ.csv` and prints the public window score. The dead ball probability comes from `model.pt` and the team split from `model_adapted.pt` | About 20 minutes |
+| `train.py` | Downloads the open matches on first use (about 4.3 GB), fits five networks on five matches, tunes the decoder on the two held-out matches and the 20 real matches, then refits the networks on all seven and saves `models/trained.pt` and `models/decoder.json` | About 4 to 5 hours |
+| `adapt.py` | Trains each network 800 more steps on the confident labels of the averaged networks for the provided match and saves `models/adapted.pt` | About 10 minutes |
+| `predict.py` | Writes `evaluation/results/BYTZ.csv` and prints the public window score. The dead ball probability comes from `trained.pt` and the team split from `adapted.pt` | About 20 minutes |
 | `validate_submission.py` | Runs the official format checks | Seconds |
 | `run_evaluation.py` | Prints the official board on the public window | Seconds |
 
 To check that everything runs, use a training of four epochs first. It still downloads the open matches and spends about 11 minutes on decoder tuning:
 
 ```bash
-uv run possession/train.py --epochs 4 --steps 60 --seeds 0 --name smoke
-uv run possession/predict.py --models smoke --decoder smoke_decoder --adapted "" --out evaluation/results/smoke.csv
+uv run possession/train.py --epochs 4 --steps 60 --seeds 0 --folder artifacts/smoke
+uv run possession/predict.py --folder artifacts/smoke --trained-only --out evaluation/results/smoke.csv
 ```
 
 ## Reproducing the Submitted File
