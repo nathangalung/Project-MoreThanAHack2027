@@ -123,10 +123,10 @@ def build(match_id: str) -> dict[str, np.ndarray]:
     }
 
 
-def load_real(match_id: str, refresh: bool = False) -> Match:
+def load_real(match_id: str) -> Match:
     """Match arrays with labels."""
     cache = REAL_DIR / match_id / "arrays.npz"
-    if refresh or not cache.is_file():
+    if not cache.is_file():
         np.savez_compressed(cache, **build(match_id))  # pyright: ignore[reportArgumentType]
     with np.load(cache) as stored:
         blocks = tuple((int(start), int(stop)) for start, stop in stored["blocks"])

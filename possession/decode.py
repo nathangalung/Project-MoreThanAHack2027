@@ -24,7 +24,7 @@ def viterbi(log_prob: np.ndarray, penalty: float) -> np.ndarray:
 
 
 def drop_short(path: np.ndarray, min_spell: int, min_dead: int) -> np.ndarray:
-    """Absorb too short runs."""
+    """Absorb runs under the minimum."""
     out = path.copy()
     for _ in range(3):
         bounds = np.concatenate(([0], np.flatnonzero(out[1:] != out[:-1]) + 1, [len(out)]))
@@ -48,7 +48,7 @@ def best_paths(prob: np.ndarray, blocks: tuple[tuple[int, int], ...], penalty: f
 
 
 def tidy(path: np.ndarray, blocks: tuple[tuple[int, int], ...], min_spell: int, min_dead: int) -> np.ndarray:
-    """Short runs removed per block."""
+    """Runs under minimum, per block."""
     out = path.copy()
     for start, stop in blocks:
         out[start:stop] = drop_short(path[start:stop], min_spell, min_dead)

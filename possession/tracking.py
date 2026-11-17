@@ -18,10 +18,8 @@ class Tracking:
     """Arrays indexed by video frame."""
 
     xy: np.ndarray
-    speed: np.ndarray
     team: np.ndarray
     ball: np.ndarray
-    ball_speed: np.ndarray
 
     @property
     def n_frames(self) -> int:
@@ -49,17 +47,15 @@ def parse_raw(raw_path: Path, n_slots: int) -> np.ndarray:
         schema_overrides=[pl.Float64] * n_columns,
         null_values=["NaN"],
     )
-    if table.width != n_columns:
-        raise ValueError(f"{raw_path}: expected {n_columns} columns, found {table.width}")
     return table.fill_null(float("nan")).to_numpy()
 
 
-def load_tracking(source: str = "tactical", refresh: bool = False) -> Tracking:
+def load_tracking(source: str = "tactical") -> Tracking:
     """Tracking arrays, cached on disk."""
     cache = CACHE_DIR / f"tracking_{source}.npz"
-    if cache.is_file() and not refresh:
+    if cache.is_file():
         with np.load(cache) as stored:
-            return Tracking(**{name: stored[name] for name in stored.files})
+            return Tracking(**{name: stored[name] for name in ("xy", "team", "ball")})
 
     team = slot_teams(asset("atd_meta", source))
     matrix = parse_raw(asset("atd_raw", source), len(team))
@@ -70,10 +66,8 @@ def load_tracking(source: str = "tactical", refresh: bool = False) -> Tracking:
     players = matrix[:, 1:-3].reshape(len(matrix), len(team), 3)
     tracking = Tracking(
         xy=players[:, :, :2].astype(np.float32),
-        speed=players[:, :, 2].astype(np.float32),
         team=team,
         ball=matrix[:, -3:-1].astype(np.float32),
-        ball_speed=matrix[:, -1].astype(np.float32),
     )
     CACHE_DIR.mkdir(exist_ok=True)
     np.savez_compressed(cache, **tracking.__dict__)

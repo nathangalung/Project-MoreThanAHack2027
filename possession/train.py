@@ -116,7 +116,7 @@ def tune_decoder(probs: list[list[np.ndarray]], groups: list[list[Match]]) -> tu
         latest = table[-len(MIN_SPELLS) * len(MIN_DEADS) :]
         print(f"penalty {penalty:>5} best per group {np.round(np.max(latest, axis=0), 4)}", flush=True)
 
-    # Smallest worst loss per group
+    # Minimax loss over the groups
     scores = np.array(table)
     regret = (scores.max(axis=0) - scores).max(axis=1)
     pick = int(regret.argmin())

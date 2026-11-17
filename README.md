@@ -12,16 +12,16 @@ The organiser documents are kept unchanged in `docs/`, and the scorer, the valid
 
 ## Approach
 
-1. Train a sequence model on seven open Bundesliga matches that carry a possession team and a ball status for every frame (DFL open dataset, Bassek et al. 2025, CC-BY 4.0).
-2. Before training, degrade the clean open tracking so it looks like the automatic tracking of the target match: smoothed positions, long stretches without the ball, lost player tracks, and no player identities.
+1. Train a sequence model on seven open matches from the German Bundesliga and 2. Bundesliga that carry a possession team and a ball status for every frame (DFL open dataset, Bassek et al. 2025, CC-BY 4.0).
+2. Before training, degrade the open tracking so it looks like the automatic tracking of the target match: smoothed positions, stretches of several seconds without the ball, lost player tracks, and no player identities.
 3. Align the broadcast recording to the tactical timeline, use the broadcast ball as a second ball track, and mark the frames where the broadcast cuts away from the live wide shot.
 4. Compute 50 features per frame that only need team membership, never identity.
 5. Predict home, away, or dead ball for each frame with a convolution and bidirectional GRU network. Five networks trained from different seeds are averaged, each over eight mirrored views of the match.
-6. Turn frame probabilities into possessions with a Viterbi decoder that charges a cost for each switch, then absorb runs that are too short.
+6. Turn frame probabilities into possessions with a Viterbi decoder that charges a cost for each switch, then absorb runs under a minimum length. The tuning chose a minimum length of zero.
 7. Choose the decoder setting on matches that are never trained on: two held-out open matches, and 20 open matches with real automatic tracking (SkillCorner open data, MIT licence).
 8. Label every graded frame before the kickoff of a half as dead ball. The kickoff frames are the anchors the organisers publish in `games.py`.
 
-No ground truth label from the target match is used for training or tuning. A last step adapts the networks to the target match with their own confident predictions, and the adapted networks only decide which team has the ball. The public 5 minutes are only printed as a check after the file is written.
+No ground truth label from the target match is used for training or tuning. A last step adapts the networks to the target match with their own confident predictions, and the adapted networks only split the live probability between the two teams. The public 5 minutes are printed as a check after the file is written. `BYTZ.md` lists the five places where they still touched the work.
 
 ## Results
 
@@ -38,9 +38,9 @@ The first two rows are measured without the adaptation step. With two networks, 
 
 | Problem in the Task | What We Do About It |
 |---|---|
-| The ranking metric counts whole possessions, so flicker is expensive | Decode segments with a switch cost and a minimum length |
-| The ball is missing on 41% of graded frames, mostly in long stretches | Train with the ball hidden in the same way, and give the model the gap length as a feature |
-| No training or tuning on the target match is allowed | Train only on the open DFL matches. Tune the decoder on two held-out DFL matches and 20 real SkillCorner matches |
+| The ranking metric counts whole possessions, so flicker is expensive | Decode segments with a switch cost |
+| The ball is missing on 41% of graded frames, mostly in stretches of several seconds | Train with the ball hidden in the same way, and give the model the gap length as a feature |
+| No labels from the target match may be used | Train on the open DFL matches, then adapt to the target match without labels. Tune the decoder on two held-out DFL matches and 20 real SkillCorner matches |
 | A score on simulated data cannot show a flaw in the simulation | Validate on real automatic tracking from another provider, and compare all features of the simulation with the target tracking |
 | Track slots are tracklets, not players | Use set features per team: nearest distances, counts, centroid, spread, speed |
 | A dead ball is hard to see from tracking when the ball stays visible, for example after a foul | Use broadcast cutaways. Directors cut to replays and close-ups during stoppages. The open matches have no broadcast, so training simulates cutaways from their dead ball segments |
@@ -50,19 +50,19 @@ The first two rows are measured without the adaptation step. With two networks, 
 | Asset | Finding | Use |
 |---|---|---|
 | Tactical tracking | 46 slots, 20.5 players per graded frame, ball seen on 59.3% of graded frames | Main input |
-| Tactical tracking | Ball gaps are long (median about 10 seconds) and the ball is often still visible during a dead ball | Dead ball needs more evidence than a missing ball |
+| Tactical tracking | Ball gaps have a median of about 10 seconds and the ball is often still visible during a dead ball | Dead ball needs more evidence than a missing ball |
 | Tactical tracking | Positions are much smoother than the open data | Open data is blurred before training |
 | Tactical tracking | 33 stretches where most tracks vanish at once | Simulated in training |
 | Open DFL tracking | The ball is frozen during every dead ball, with a speed of exactly zero. In the target match it keeps moving, because a player carries it to the restart spot. A model trained on the frozen ball found only 32% of dead ball frames in the public window | Training replaces the frozen ball with one that moves between nearby players toward the restart spot. The final model finds 90% of them |
 | Tactical tracking | The ball is never visible for only a few frames, rarely drops out for one frame, and moves much more smoothly than our first simulation (99th percentile of acceleration 32 m/s² against 62 to 288) | Simulation matched to these statistics. On 20 real matches, two averaged networks rose from 0.591 to 0.610 spellF1 |
 | SkillCorner open data | 20 A-League matches with real broadcast tracking and a possession team per frame. The ball is seen on about 60% of frames, like the target. Possessions last 10 to 18 seconds, against 5.5 to 9.2 in the DFL labels | Validation and decoder setting only, never training |
-| Smart Tagging | Phases cover about 40% of graded frames, set pieces are fixed 35 second windows, every throw-in has no team | Not used. An earlier version read the kickoff tags, but the tag of the second half starts 81 frames before the kickoff the organisers publish |
+| Smart Tagging | Phases cover about 40% of graded frames, set pieces are windows of exactly 35 seconds, every throw-in has no team | Not used. An earlier version read the kickoff tags, but the tag of the second half starts 81 frames before the kickoff the organisers publish |
 | Broadcast tracking | Its ball track matches the tactical one with a constant lag per half (4,014 and 26,920 frames), found by cross correlation, median ball distance under 1 metre | Fills 13% of tactical ball gaps, graded ball coverage rises from 59.3% to 64.4% |
 | Both ball tracks | They differ by over 5 metres on 13% of shared frames, and 83% of those differences lie along the camera viewing axis. A raised ball seen from two camera heights gives exactly this | The distance between the two tracks is a feature. Training simulates two cameras using the real ball height in the open data |
 | Broadcast homography | Invalid on 33% of graded frames (replays, close-ups). We first noticed in the public window that these cover 76% of dead ball frames and under 4% of live frames, and then confirmed the value of the input on held-out open matches | Cutaway flag and timing features |
 | Tactical homography | The camera centre follows the ball along the pitch (correlation 0.83) but is 12 metres off on median, about what the player centroid already gives | Tried, not used |
 | Tactical audio | Whistle tones are detectable, but in the public window they gave 3 hits, 3 false alarms, and 2 missed stoppages. The open matches have no audio, so this is the only check we could make, and it is the one choice that rests on the public window | Tried, not used |
-| Video frames | Ball detection could gain at most 0.020 spellF1 with a perfect detector, because the ball is already visible on all but 2.5% of the frames predicted live | Measured, not built |
+| Video frames | On held-out open matches, revealing every hidden ball during live play gains 0.020 spellF1. In the target match only 2.5% of graded frames are predicted live with the ball hidden | Measured, not built |
 | Target tracking without labels | Networks that adapt to a real match with their own confident labels gain 0.014 spellF1 on real matches. Half of that comes from frames with no players, which the target tracking does not have, and on data built like the target the step changes nothing. The gain that carries over is in the team decision: with the stoppage decision left to the original networks, the gain is 0.009 on real matches and 0.003 on data built like the target | Adopted for the team decision only. `BYTZ.md` has the numbers |
 
 ## Folder Layout
@@ -72,8 +72,9 @@ The first two rows are measured without the adaptation step. With two networks, 
 | `possession/` | Ours | The pipeline package: loading, features, model, training, prediction |
 | `BYTZ.md` | Ours | The technical document |
 | `pipeline.ipynb` | Ours | Runs the pipeline step by step and shows tables and charts |
-| `tests/` | Ours | Tests for the metric, decoder, features, and degradation |
-| `models/` | Ours | Trained weights and decoder settings, committed after training |
+| `tests/` | Ours | Unit tests for every module and acceptance scenarios for the submission file |
+| `models/` | Ours | Trained weights, adapted weights, and the decoder setting, committed after training |
+| `.github/workflows/checks.yml` | Ours | Runs lint, format check, type check, and the tests on every push |
 | `evaluation/` | Organisers | The scorer, the validator, match constants, the public ground truth, and the results folder |
 | `docs/` | Organisers | Challenge, data, evaluation, and rules documents |
 | `data/` | Organisers | The match data, not committed |
@@ -109,14 +110,14 @@ uv run evaluation/run_evaluation.py
 | Command | What It Does | Time on an RTX 4060 |
 |---|---|---|
 | `uv sync` | Installs the pinned dependencies from `uv.lock` | A few minutes |
-| `uv run pytest` | Checks the metric against the scorer, and the decoder, features, and degradation | Seconds |
+| `uv run pytest` | Runs 45 tests on synthetic data, with no download and no match data, and fails if line coverage of `possession/` drops under 99% (it is 100%) | About 30 seconds |
 | `train.py` | Downloads the open matches on first use (about 4.3 GB), fits five networks on five matches, tunes the decoder on the two held-out matches and the 20 real matches, then refits the networks on all seven and saves `models/model.pt` and `models/model_decoder.json` | About 4 to 5 hours |
-| `adapt.py` | Trains each network 800 more steps on its own confident labels of the provided match and saves `models/model_adapted.pt` | About 10 minutes |
-| `predict.py` | Writes `evaluation/results/BYTZ.csv` and prints the public window score. The stoppage decision comes from `model.pt` and the team decision from `model_adapted.pt` | About 20 minutes |
+| `adapt.py` | Trains each network 800 more steps on the confident labels of the averaged networks for the provided match and saves `models/model_adapted.pt` | About 10 minutes |
+| `predict.py` | Writes `evaluation/results/BYTZ.csv` and prints the public window score. The dead ball probability comes from `model.pt` and the team split from `model_adapted.pt` | About 20 minutes |
 | `validate_submission.py` | Runs the official format checks | Seconds |
 | `run_evaluation.py` | Prints the official board on the public window | Seconds |
 
-For a quick check that everything runs, use a short training first. It still downloads the open matches and spends about 11 minutes on decoder tuning:
+To check that everything runs, use a training of four epochs first. It still downloads the open matches and spends about 11 minutes on decoder tuning:
 
 ```bash
 uv run possession/train.py --epochs 4 --steps 60 --seeds 0 --name smoke
@@ -131,7 +132,7 @@ An earlier version of the training gave byte identical weights when run twice on
 uv run possession/predict.py
 ```
 
-`predict.py` runs on CPU by default, which gave the same file on every run we tried. CUDA inference gave a slightly different file, so do not pass `--device cuda` for the final file.
+`predict.py` runs on CPU by default, which gave the same file on every run we tried. CUDA inference gave a different file, so do not pass `--device cuda` for the final file.
 
 ## Code Layout
 
@@ -143,16 +144,20 @@ uv run possession/predict.py
 | `possession/dfl.py` | Downloads and parses the open DFL matches |
 | `possession/skillcorner.py` | Downloads and parses the open SkillCorner matches with real tracking |
 | `possession/match.py` | Common array format for every match, and its mirrored views |
-| `possession/degrade.py` | Makes clean tracking look automatic |
+| `possession/degrade.py` | Makes open tracking look automatic |
 | `possession/features.py` | Per frame features |
 | `possession/model.py` | Network, windowed inference, and averaging over mirrored views |
-| `possession/decode.py` | Viterbi decoder and short run removal |
+| `possession/decode.py` | Viterbi decoder and removal of runs under a minimum length |
 | `possession/metrics.py` | spellF1 and macroF1 for tuning on open matches |
 | `possession/train.py` | Training on fresh degraded copies each epoch, and decoder tuning on both validation sets |
 | `possession/adapt.py` | Adaptation to the target match with pseudo-labels, used for the team decision |
 | `possession/predict.py` | Submission writer |
 | `tests/test_metrics.py` | Compares our metric with the official scorer |
 | `tests/test_pipeline.py` | Checks the decoder, features, and degradation |
+| `tests/test_loaders.py` | Checks the tracking, broadcast, DFL, and SkillCorner loaders on files written by the test |
+| `tests/test_training.py` | Runs the training, decoder tuning, and saving on toy matches |
+| `tests/features/submission.feature` | Acceptance scenarios for the submission file in Given, When, Then form |
+| `tests/test_acceptance.py` | Steps that run those scenarios through prediction and adaptation |
 
 ## Dependencies
 
@@ -162,7 +167,7 @@ uv run possession/predict.py
 | pandas (group `evaluation`) | Needed only by the organisers' scorer, which we keep unchanged |
 | numpy | Array maths for features, decoding, and metrics |
 | torch | The sequence model, on GPU when one is present |
-| ruff, pyright, pytest (group `dev`) | Lint, type check, tests |
+| ruff, pyright, pytest, pytest-cov, pytest-bdd (group `dev`) | Lint, type check, tests, coverage, and acceptance scenarios |
 | jupyterlab, matplotlib (group `notebook`) | The notebook and its charts |
 
 ## Training and Validation Data
@@ -176,5 +181,5 @@ uv run possession/predict.py
 
 1. The label style of the target ground truth is unknown to us. The DFL labels switch on brief touches and the SkillCorner labels do not, so the decoder setting is a compromise between the two.
 2. The organisers call their kickoff frames playback anchors, so the dead ball rule may be off by a frame or two at the second kickoff.
-3. Cutaway timing in training is simulated, not measured, because the DFL matches have no broadcast. The simulation uses wide random ranges so the model does not depend on one setting.
+3. Cutaway timing in training is simulated, not measured, because the DFL matches have no broadcast. The simulation uses random ranges so the model does not depend on one setting.
 4. Not used: the Smart Tagging phases, and ball detection from video for frames where both trackers lost the ball.

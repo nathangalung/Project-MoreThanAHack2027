@@ -112,10 +112,10 @@ def build(match_id: str) -> dict[str, np.ndarray]:
     return arrays
 
 
-def load_dfl(match_id: str, refresh: bool = False) -> tuple[Match, np.ndarray]:
+def load_dfl(match_id: str) -> tuple[Match, np.ndarray]:
     """Match arrays and ball height."""
     cache = DFL_DIR / f"{match_id}.npz"
-    if refresh or not cache.is_file():
+    if not cache.is_file():
         np.savez_compressed(cache, **build(match_id))  # pyright: ignore[reportArgumentType]
     with np.load(cache) as stored:
         stops = np.cumsum(stored["lengths"])

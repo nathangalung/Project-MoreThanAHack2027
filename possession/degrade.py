@@ -1,4 +1,4 @@
-"""Make clean tracking look automatic."""
+"""Make open tracking look automatic."""
 
 from dataclasses import replace
 
@@ -53,7 +53,7 @@ def hide_ball(match: Match, height: np.ndarray, rng: np.random.Generator) -> np.
 
 
 def confirm_tracks(ball: np.ndarray, rng: np.random.Generator) -> np.ndarray:
-    """Drop ball tracks too short."""
+    """Drop ball tracks under minimum."""
     # Trackers report only confirmed tracks
     out = ball.copy()
     shortest = rng.uniform(15, 50)
@@ -187,7 +187,7 @@ def degrade(match: Match, height: np.ndarray, seed: int) -> Match:
         view[height > rng.uniform(5, 25)] = np.nan
         views.append(view)
     ball, second = views
-    # Alignment is slightly off
+    # Alignment is off by frames
     second = np.roll(second, int(rng.integers(-3, 4)), axis=0)
     second[cut] = np.nan
     blur = rng.uniform(1.5, 4.0)
@@ -201,7 +201,7 @@ def degrade(match: Match, height: np.ndarray, seed: int) -> Match:
         players[np.ix_(lost, ~keep)] = np.nan
     ball, second = confirm_tracks(ball, rng), confirm_tracks(second, rng)
 
-    # Pitch origin is slightly off
+    # Pitch origin off by metres
     offset = rng.uniform(-2.5, 2.5, 2).astype(np.float32)
     home, away, ball, second = home + offset, away + offset, ball + offset, second + offset
 
